@@ -7,6 +7,7 @@ import {
   SafeAreaView,
   Alert,
   Pressable,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
