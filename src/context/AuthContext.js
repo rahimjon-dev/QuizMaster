@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../services/supabase';
 import { generateToken, verifyToken } from '../utils/jwt';
 
 const USERS_DB_KEY = '@quizmaster_users_db_v1';
@@ -15,23 +16,82 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     bootstrapAuth();
+
+    // Listen to real-time Supabase auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          const supabaseUser = {
+            id: session.user.id,
+            name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Player',
+            email: session.user.email,
+            createdAt: new Date(session.user.created_at || Date.now()).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }),
+            stats: {
+              quizzesPlayed: 0,
+              totalScore: 0,
+              totalQuestions: 0,
+              highestScore: 0,
+              winRate: 0,
+            },
+          };
+          setUser((prev) => ({ ...supabaseUser, ...(prev?.id === supabaseUser.id ? prev : {}) }));
+          setToken(session.access_token);
+          await AsyncStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
+          await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(supabaseUser));
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+          setToken(null);
+          await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, CURRENT_USER_KEY]);
+        }
+      }
+    );
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   // Restore authenticated session on app launch
   const bootstrapAuth = async () => {
     try {
+      // 1. Check Supabase session first
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionData?.session?.user) {
+        const supaUser = sessionData.session.user;
+        const formattedUser = {
+          id: supaUser.id,
+          name: supaUser.user_metadata?.name || supaUser.email?.split('@')[0] || 'Player',
+          email: supaUser.email,
+          createdAt: new Date(supaUser.created_at || Date.now()).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          stats: {
+            quizzesPlayed: 0,
+            totalScore: 0,
+            totalQuestions: 0,
+            highestScore: 0,
+            winRate: 0,
+          },
+        };
+        setUser(formattedUser);
+        setToken(sessionData.session.access_token);
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Fallback to cached local session
       const savedToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
       const savedUserJson = await AsyncStorage.getItem(CURRENT_USER_KEY);
 
       if (savedToken && savedUserJson) {
-        const payload = verifyToken(savedToken);
-        if (payload) {
-          setToken(savedToken);
-          setUser(JSON.parse(savedUserJson));
-        } else {
-          // Token expired or invalid
-          await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, CURRENT_USER_KEY]);
-        }
+        setToken(savedToken);
+        setUser(JSON.parse(savedUserJson));
       }
     } catch (e) {
       console.error('Failed to restore auth session:', e);
@@ -40,14 +100,70 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register new user
+  // Register new user with Supabase + Local backup
   const register = async (name, email, password) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
-      const normalizedEmail = email.trim().toLowerCase();
+      // Attempt registration with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password,
+        options: {
+          data: {
+            name: name.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        console.warn('Supabase signup notice:', error.message);
+        // If Supabase fails due to network or email confirmation rule, use local persistence
+        return await registerLocally(name, normalizedEmail, password);
+      }
+
+      if (data?.user) {
+        const newUser = {
+          id: data.user.id,
+          name: name.trim(),
+          email: normalizedEmail,
+          createdAt: new Date().toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          stats: {
+            quizzesPlayed: 0,
+            totalScore: 0,
+            totalQuestions: 0,
+            highestScore: 0,
+            winRate: 0,
+          },
+        };
+
+        const activeToken = data.session?.access_token || generateToken(newUser);
+
+        await AsyncStorage.setItem(AUTH_TOKEN_KEY, activeToken);
+        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
+
+        setUser(newUser);
+        setToken(activeToken);
+        return { success: true };
+      }
+
+      return await registerLocally(name, normalizedEmail, password);
+    } catch (e) {
+      console.error('Registration error, falling back locally:', e);
+      return await registerLocally(name, normalizedEmail, password);
+    }
+  };
+
+  // Local fallback registration
+  const registerLocally = async (name, normalizedEmail, password) => {
+    try {
       const usersJson = await AsyncStorage.getItem(USERS_DB_KEY);
       const users = usersJson ? JSON.parse(usersJson) : [];
 
-      // Check if email already registered
       if (users.some((u) => u.email === normalizedEmail)) {
         return { success: false, message: 'This email is already registered.' };
       }
@@ -56,7 +172,7 @@ export const AuthProvider = ({ children }) => {
         id: `user_${Date.now()}`,
         name: name.trim(),
         email: normalizedEmail,
-        password, // In real backend this would be salted & hashed
+        password,
         createdAt: new Date().toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -71,14 +187,10 @@ export const AuthProvider = ({ children }) => {
         },
       };
 
-      // Generate JWT Token
       const jwtToken = generateToken(newUser);
-
-      // Save to local users DB
       users.push(newUser);
-      await AsyncStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
 
-      // Save active session
+      await AsyncStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, jwtToken);
       await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
 
@@ -86,44 +198,80 @@ export const AuthProvider = ({ children }) => {
       setToken(jwtToken);
       return { success: true };
     } catch (e) {
-      console.error('Registration failed:', e);
-      return { success: false, message: 'Failed to create account. Please try again.' };
+      return { success: false, message: 'Could not register user.' };
     }
   };
 
-  // Login user
+  // Login user with Supabase + Local backup
   const login = async (email, password) => {
+    const normalizedEmail = email.trim().toLowerCase();
+
     try {
-      const normalizedEmail = email.trim().toLowerCase();
+      // 1. Try Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+
+      if (!error && data?.user) {
+        const supaUser = {
+          id: data.user.id,
+          name: data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'Player',
+          email: data.user.email,
+          createdAt: new Date(data.user.created_at || Date.now()).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          }),
+          stats: {
+            quizzesPlayed: 0,
+            totalScore: 0,
+            totalQuestions: 0,
+            highestScore: 0,
+            winRate: 0,
+          },
+        };
+
+        const activeToken = data.session?.access_token || generateToken(supaUser);
+        await AsyncStorage.setItem(AUTH_TOKEN_KEY, activeToken);
+        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(supaUser));
+
+        setUser(supaUser);
+        setToken(activeToken);
+        return { success: true };
+      }
+
+      // 2. Try Local Users DB if Supabase signin failed or user registered offline
       const usersJson = await AsyncStorage.getItem(USERS_DB_KEY);
       const users = usersJson ? JSON.parse(usersJson) : [];
-
-      const foundUser = users.find(
+      const localUser = users.find(
         (u) => u.email === normalizedEmail && u.password === password
       );
 
-      if (!foundUser) {
-        return { success: false, message: 'Invalid email or password.' };
+      if (localUser) {
+        const jwtToken = generateToken(localUser);
+        await AsyncStorage.setItem(AUTH_TOKEN_KEY, jwtToken);
+        await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(localUser));
+
+        setUser(localUser);
+        setToken(jwtToken);
+        return { success: true };
       }
 
-      // Generate fresh JWT Token
-      const jwtToken = generateToken(foundUser);
-
-      await AsyncStorage.setItem(AUTH_TOKEN_KEY, jwtToken);
-      await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(foundUser));
-
-      setUser(foundUser);
-      setToken(jwtToken);
-      return { success: true };
+      return {
+        success: false,
+        message: error?.message || 'Invalid email or password.',
+      };
     } catch (e) {
-      console.error('Login error:', e);
-      return { success: false, message: 'Login failed. Please check your credentials.' };
+      console.error('Login exception:', e);
+      return { success: false, message: 'Network error or invalid credentials.' };
     }
   };
 
   // Logout user
   const logout = async () => {
     try {
+      await supabase.auth.signOut();
       await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, CURRENT_USER_KEY]);
       setUser(null);
       setToken(null);
@@ -162,18 +310,7 @@ export const AuthProvider = ({ children }) => {
         },
       };
 
-      // Update in users DB
-      const usersJson = await AsyncStorage.getItem(USERS_DB_KEY);
-      if (usersJson) {
-        const users = JSON.parse(usersJson);
-        const index = users.findIndex((u) => u.id === user.id);
-        if (index !== -1) {
-          users[index] = updatedUser;
-          await AsyncStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-        }
-      }
-
-      // Update session
+      // Save to local session
       await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
       setUser(updatedUser);
     } catch (e) {

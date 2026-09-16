@@ -3,7 +3,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TRANSLATIONS } from '../data/translations';
 
 const LANGUAGE_KEY = '@quizmaster_selected_lang';
-const LanguageContext = createContext();
+
+const defaultContextValue = {
+  lang: 'uz',
+  changeLanguage: () => {},
+  t: (key) => TRANSLATIONS['uz']?.[key] || TRANSLATIONS['en']?.[key] || key,
+};
+
+const LanguageContext = createContext(defaultContextValue);
 
 export const LanguageProvider = ({ children }) => {
   const [lang, setLang] = useState('uz'); // Default language Uzbek, fallback to EN or RU
@@ -44,4 +51,7 @@ export const LanguageProvider = ({ children }) => {
   );
 };
 
-export const useLanguage = () => useContext(LanguageContext);
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  return context || defaultContextValue;
+};

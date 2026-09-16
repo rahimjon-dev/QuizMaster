@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../services/supabase';
 
 const STORAGE_KEY = '@quizmaster_history_v1';
 
 /**
- * Save a completed quiz result to AsyncStorage
+ * Save a completed quiz result to AsyncStorage and optionally Supabase
  * @param {Object} resultData - { category, categoryId, score, totalQuestions, percentage, correctAnswers, wrongAnswers, date, userId, difficulty }
  */
 export const saveQuizResult = async (resultData) => {
@@ -24,12 +25,39 @@ export const saveQuizResult = async (resultData) => {
       ...resultData,
     };
 
-    // Prepend new result (newest first)
+    // 1. Save to local AsyncStorage (immediate & guaranteed)
     const updatedHistory = [newResult, ...existingHistory];
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedHistory));
+
+    // 2. Sync to Supabase in the background if possible
+    if (resultData.userId) {
+      supabase
+        .from('quiz_history')
+        .insert([
+          {
+            user_id: resultData.userId,
+            category: resultData.category,
+            category_id: resultData.categoryId,
+            difficulty: resultData.difficulty,
+            score: resultData.score,
+            total_questions: resultData.totalQuestions,
+            percentage: resultData.percentage,
+            correct_answers: resultData.correctAnswers,
+            wrong_answers: resultData.wrongAnswers,
+          },
+        ])
+        .then(({ error }) => {
+          if (error) {
+            // Table might not exist yet on Supabase dashboard, which is totally fine
+            console.log('Supabase sync note:', error.message);
+          }
+        })
+        .catch(() => {});
+    }
+
     return true;
   } catch (error) {
-    console.error('Failed to save quiz result to AsyncStorage:', error);
+    console.error('Failed to save quiz result:', error);
     return false;
   }
 };
