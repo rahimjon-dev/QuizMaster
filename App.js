@@ -12,7 +12,7 @@ export default function App() {
       <LanguageProvider>
         <AuthProvider>
           <NavigationContainer>
-            <StatusBar style="light" />
+            <StatusBar style="auto" />
             <AppNavigator />
           </NavigationContainer>
         </AuthProvider>

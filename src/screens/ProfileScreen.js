@@ -1,169 +1,133 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   StyleSheet,
   Text,
   View,
   ScrollView,
   SafeAreaView,
-  Alert,
   Pressable,
-  Platform,
+  StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { useLanguage } from '../context/LanguageContext';
-import { getQuizHistory } from '../utils/storage';
-import PrimaryButton from '../components/PrimaryButton';
+import BottomTabBar from '../components/BottomTabBar';
 
 export default function ProfileScreen({ navigation }) {
-  const { user, token, logout } = useAuth();
-  const { t } = useLanguage();
-  const [history, setHistory] = useState([]);
-  const [showFullToken, setShowFullToken] = useState(false);
+  const { user, logout } = useAuth();
 
-  useEffect(() => {
-    loadUserHistory();
-  }, []);
+  const userName = user?.name || 'Xusniddin Baxromjonov';
+  const userEmail = user?.email || 'xusniddin@example.com';
 
-  const loadUserHistory = async () => {
-    const allHistory = await getQuizHistory();
-    // Filter history for current user if tagged, or show latest
-    const userHistory = allHistory.filter(
-      (h) => !h.userId || h.userId === user?.id
-    );
-    setHistory(userHistory.slice(0, 5)); // show latest 5
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      t('logout'),
-      t('confirmLogout'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('logout'),
-          style: 'destructive',
-          onPress: () => logout(),
-        },
-      ]
-    );
-  };
-
-  const stats = user?.stats || {
-    quizzesPlayed: 0,
-    totalScore: 0,
-    totalQuestions: 0,
-    highestScore: 0,
-    winRate: 0,
-  };
-
-  const initials = user?.name
-    ? user.name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'QM';
+  const menuItems = [
+    {
+      id: 'results',
+      title: 'Mening natijalarim',
+      icon: 'trophy-outline',
+      onPress: () => navigation.navigate('History'),
+    },
+    {
+      id: 'friends',
+      title: "Do'stlarim",
+      icon: 'people-outline',
+      onPress: () => navigation.navigate('Leaderboard'),
+    },
+    {
+      id: 'settings',
+      title: 'Sozlamalar',
+      icon: 'settings-outline',
+      onPress: () => navigation.navigate('Settings'),
+    },
+    {
+      id: 'help',
+      title: 'Yordam',
+      icon: 'help-circle-outline',
+      onPress: () => navigation.navigate('About'),
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Profile Card */}
-        <View style={styles.profileHeaderCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <Text style={styles.userName}>{user?.name || 'QuizMaster Player'}</Text>
-          <Text style={styles.userEmail}>{user?.email}</Text>
-          <View style={styles.joinedBadge}>
-            <Text style={styles.joinedText}>Member since {user?.createdAt || '2026'}</Text>
-          </View>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <View style={styles.container}>
+        {/* Top Header with Settings Gear Icon */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profil</Text>
+          <Pressable
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.settingsBtn}
+          >
+            <Ionicons name="settings-outline" size={24} color="#0F172A" />
+          </Pressable>
         </View>
 
-        {/* Player Statistics Grid */}
-        <Text style={styles.sectionTitle}>📊 {t('stats')}</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>{stats.quizzesPlayed}</Text>
-            <Text style={styles.statLabel}>{t('quizzesPlayed')}</Text>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Avatar and User Info */}
+          <View style={styles.profileCard}>
+            <View style={styles.avatarWrapper}>
+              <LinearGradient
+                colors={['#818CF8', '#6366F1']}
+                style={styles.avatarCircle}
+              >
+                <Ionicons name="person" size={48} color="#FFFFFF" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userEmail}>{userEmail}</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statNumber, { color: '#F59E0B' }]}>
-              {stats.highestScore}
-            </Text>
-            <Text style={styles.statLabel}>{t('bestScore')}</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statNumber, { color: '#10B981' }]}>
-              {stats.winRate}%
-            </Text>
-            <Text style={styles.statLabel}>{t('accuracy')}</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statNumber, { color: '#EC4899' }]}>
-              {stats.totalScore}
-            </Text>
-            <Text style={styles.statLabel}>Total Points</Text>
-          </View>
-        </View>
 
-        {/* Personal JWT Token Panel */}
-        <View style={styles.jwtCard}>
-          <View style={styles.jwtHeader}>
-            <Text style={styles.jwtTitle}>🔐 {t('tokenInfo')}</Text>
-            <Pressable
-              onPress={() => setShowFullToken(!showFullToken)}
-              style={styles.toggleTokenBtn}
-            >
-              <Text style={styles.toggleTokenText}>
-                {showFullToken ? 'Hide' : 'Inspect'}
-              </Text>
-            </Pressable>
-          </View>
-          <Text style={styles.jwtDescription}>
-            Every logged-in user is authenticated with a cryptographic JWT session token:
-          </Text>
-          <View style={styles.tokenBox}>
-            <Text style={styles.tokenCode} numberOfLines={showFullToken ? undefined : 2}>
-              {token || 'No active JWT token found'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Recent Performance Section */}
-        {history.length > 0 && (
-          <View style={styles.recentSection}>
-            <View style={styles.recentHeader}>
-              <Text style={styles.sectionTitle}>📜 Recent Quizzes</Text>
-              <Pressable onPress={() => navigation.navigate('History')}>
-                <Text style={styles.viewAllText}>View All →</Text>
-              </Pressable>
+          {/* 3 Stats Row */}
+          <View style={styles.statsRow}>
+            {/* 1. O'yinlar */}
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statLabel}>O'yinlar</Text>
             </View>
 
-            {history.map((item) => (
-              <View key={item.id} style={styles.miniHistoryCard}>
-                <View>
-                  <Text style={styles.miniCategory}>{item.category}</Text>
-                  <Text style={styles.miniDate}>{item.date}</Text>
+            {/* 2. G'alabalar */}
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>8</Text>
+              <Text style={styles.statLabel}>G'alabalar</Text>
+            </View>
+
+            {/* 3. Umumiy ball */}
+            <View style={styles.statBox}>
+              <Text style={styles.statNumber}>245</Text>
+              <Text style={styles.statLabel}>Umumiy ball</Text>
+            </View>
+          </View>
+
+          {/* Menu Items */}
+          <View style={styles.menuContainer}>
+            {menuItems.map((item, index) => (
+              <Pressable
+                key={item.id}
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  index < menuItems.length - 1 && styles.menuItemBorder,
+                  pressed && styles.menuItemPressed,
+                ]}
+                onPress={item.onPress}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={styles.menuIconCircle}>
+                    <Ionicons name={item.icon} size={20} color="#6366F1" />
+                  </View>
+                  <Text style={styles.menuItemTitle}>{item.title}</Text>
                 </View>
-                <View style={styles.miniScoreBadge}>
-                  <Text style={styles.miniScoreText}>
-                    {item.score} / {item.totalQuestions} ({item.percentage}%)
-                  </Text>
-                </View>
-              </View>
+
+                <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+              </Pressable>
             ))}
           </View>
-        )}
+        </ScrollView>
 
-        {/* Logout Button */}
-        <PrimaryButton
-          title={`🚪 ${t('logout')}`}
-          variant="danger"
-          onPress={handleLogout}
-          style={styles.logoutBtn}
-        />
-      </ScrollView>
+        {/* Bottom Navigation Bar */}
+        <BottomTabBar activeTab="profile" navigation={navigation} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -171,194 +135,134 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
   },
   container: {
-    padding: 20,
-    paddingBottom: 40,
+    flex: 1,
   },
-  profileHeaderCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 24,
-    padding: 24,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#334155',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 8,
   },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#0284C7',
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  settingsBtn: {
+    padding: 6,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  profileCard: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
+    marginVertical: 16,
   },
-  avatarText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  userName: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#94A3B8',
+  avatarWrapper: {
+    position: 'relative',
     marginBottom: 12,
   },
-  joinedBadge: {
-    backgroundColor: '#0F172A',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
+  avatarCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  joinedText: {
-    fontSize: 12,
-    color: '#38BDF8',
-    fontWeight: '600',
+  userName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#F1F5F9',
-    marginBottom: 14,
+  userEmail: {
+    fontSize: 13,
+    color: '#94A3B8',
+    marginTop: 4,
   },
-  statsGrid: {
+  statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    justifyContent: 'space-around',
+    marginVertical: 18,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statBox: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#1E293B',
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
     alignItems: 'center',
+    flex: 1,
   },
   statNumber: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '800',
-    color: '#38BDF8',
-    marginBottom: 4,
+    color: '#0F172A',
   },
   statLabel: {
     fontSize: 12,
-    fontWeight: '600',
     color: '#94A3B8',
-    textAlign: 'center',
+    marginTop: 4,
+    fontWeight: '500',
   },
-  jwtCard: {
-    backgroundColor: '#1E1B4B',
+  menuContainer: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 18,
-    marginBottom: 24,
-    borderWidth: 1.5,
-    borderColor: '#4338CA',
-  },
-  jwtHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  jwtTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F59E0B',
-  },
-  toggleTokenBtn: {
-    backgroundColor: '#0F172A',
     paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  toggleTokenText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#38BDF8',
-  },
-  jwtDescription: {
-    fontSize: 12,
-    color: '#CBD5E1',
-    marginBottom: 10,
-    lineHeight: 16,
-  },
-  tokenBox: {
-    backgroundColor: '#0F172A',
-    padding: 12,
-    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  tokenCode: {
-    fontSize: 11,
-    color: '#38BDF8',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    lineHeight: 16,
-  },
-  recentSection: {
-    marginBottom: 24,
-  },
-  recentHeader: {
+  menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
   },
-  viewAllText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#38BDF8',
+  menuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
   },
-  miniHistoryCard: {
+  menuItemPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  menuItemLeft: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
   },
-  miniCategory: {
+  menuIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  menuItemTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 2,
-  },
-  miniDate: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  miniScoreBadge: {
-    backgroundColor: '#0F172A',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  miniScoreText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#10B981',
-  },
-  logoutBtn: {
-    marginTop: 8,
+    fontWeight: '600',
+    color: '#1E293B',
   },
 });

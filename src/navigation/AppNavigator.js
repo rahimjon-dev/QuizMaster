@@ -3,103 +3,73 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 
-// Auth Screens
+// Screens matching the 12 mockup designs
+import SplashScreen from '../screens/SplashScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
-
-// App Screens
 import HomeScreen from '../screens/HomeScreen';
+import CategoriesScreen from '../screens/CategoriesScreen';
 import QuizScreen from '../screens/QuizScreen';
 import ResultScreen from '../screens/ResultScreen';
-import HistoryScreen from '../screens/HistoryScreen';
+import LeaderboardScreen from '../screens/LeaderboardScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import AboutScreen from '../screens/AboutScreen';
+import HistoryScreen from '../screens/HistoryScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function AppNavigator() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+        <ActivityIndicator size="large" color="#6366F1" />
       </View>
     );
   }
 
   return (
     <Stack.Navigator
+      initialRouteName="Splash"
       screenOptions={{
-        headerStyle: {
-          backgroundColor: '#0F172A',
-        },
-        headerTintColor: '#38BDF8',
-        headerTitleStyle: {
-          fontWeight: '700',
-          color: '#F8FAFC',
-        },
-        headerShadowVisible: false,
+        headerShown: false,
+        animation: 'fade',
         contentStyle: {
-          backgroundColor: '#0F172A',
+          backgroundColor: '#F8FAFC',
         },
       }}
     >
-      {!user ? (
-        // Auth Stack
-        <>
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Register"
-            component={RegisterScreen}
-            options={{ headerShown: false }}
-          />
-        </>
-      ) : (
-        // Main App Stack
-        <>
-          <Stack.Screen
-            name="Home"
-            component={HomeScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Quiz"
-            component={QuizScreen}
-            options={{
-              title: 'Quiz Challenge',
-              headerBackTitleVisible: false,
-            }}
-          />
-          <Stack.Screen
-            name="Result"
-            component={ResultScreen}
-            options={{
-              headerShown: false,
-              gestureEnabled: false,
-            }}
-          />
-          <Stack.Screen
-            name="Profile"
-            component={ProfileScreen}
-            options={{
-              title: 'Player Profile',
-              headerBackTitleVisible: false,
-            }}
-          />
-          <Stack.Screen
-            name="History"
-            component={HistoryScreen}
-            options={{
-              title: 'Quiz History',
-              headerBackTitleVisible: false,
-            }}
-          />
-        </>
-      )}
+      {/* 1. Splash Screen */}
+      <Stack.Screen name="Splash" component={SplashScreen} />
+
+      {/* 2. Onboarding (3 slides) */}
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+
+      {/* 3. Auth Screens */}
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+
+      {/* 4. Main App Pages */}
+      <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Categories" component={CategoriesScreen} />
+      <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+
+      {/* 5. Quiz Gameplay & Results */}
+      <Stack.Screen name="Quiz" component={QuizScreen} />
+      <Stack.Screen
+        name="Result"
+        component={ResultScreen}
+        options={{ gestureEnabled: false }}
+      />
+
+      {/* 6. Settings, About & History */}
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="About" component={AboutScreen} />
+      <Stack.Screen name="History" component={HistoryScreen} />
     </Stack.Navigator>
   );
 }
@@ -107,7 +77,7 @@ export default function AppNavigator() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
   },
