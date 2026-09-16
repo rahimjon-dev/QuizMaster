@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomTabBar from '../components/BottomTabBar';
 
 const LEADERBOARD_DATA = [
@@ -26,6 +27,7 @@ const LEADERBOARD_DATA = [
 ];
 
 export default function LeaderboardScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('umumiy'); // 'umumiy' | 'haftalik' | 'oylik'
 
   return (
@@ -33,7 +35,7 @@ export default function LeaderboardScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 }]}>
           <Text style={styles.headerTitle}>Reyting</Text>
         </View>
 

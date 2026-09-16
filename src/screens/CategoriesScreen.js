@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QUIZ_CATEGORIES } from '../data/quizzes';
 import BottomTabBar from '../components/BottomTabBar';
 
 export default function CategoriesScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredCategories = QUIZ_CATEGORIES.filter((category) =>
@@ -35,7 +37,7 @@ export default function CategoriesScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.container}>
         {/* Top Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 }]}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </Pressable>

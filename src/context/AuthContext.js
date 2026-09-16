@@ -126,7 +126,9 @@ const normalizeIdentifier = (input) => {
       });
 
       if (error) {
-        console.warn('Supabase signup notice:', error.message);
+        if (error.message?.toLowerCase().includes('already registered')) {
+          return await login(emailOrPhone, password);
+        }
         return await registerLocally(displayName, normalizedEmail, password);
       }
 
@@ -161,7 +163,6 @@ const normalizeIdentifier = (input) => {
 
       return await registerLocally(displayName, normalizedEmail, password);
     } catch (e) {
-      console.error('Registration error, falling back locally:', e);
       return await registerLocally(displayName, normalizedEmail, password);
     }
   };
@@ -172,8 +173,17 @@ const normalizeIdentifier = (input) => {
       const usersJson = await AsyncStorage.getItem(USERS_DB_KEY);
       const users = usersJson ? JSON.parse(usersJson) : [];
 
-      if (users.some((u) => u.email === normalizedEmail)) {
-        return { success: false, message: 'This email is already registered.' };
+      const existing = users.find((u) => u.email === normalizedEmail);
+      if (existing) {
+        if (existing.password === password) {
+          const jwtToken = generateToken(existing);
+          await AsyncStorage.setItem(AUTH_TOKEN_KEY, jwtToken);
+          await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(existing));
+          setUser(existing);
+          setToken(jwtToken);
+          return { success: true };
+        }
+        return { success: false, message: 'Bu hisob allaqachon mavjud. Kirish bo\'limidan parolingizni kiriting.' };
       }
 
       const newUser = {

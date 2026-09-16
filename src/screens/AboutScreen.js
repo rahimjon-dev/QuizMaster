@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QuizMasterLogo } from '../components/illustrations';
 
 export default function AboutScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const handleOpenLink = (url) => {
     Linking.openURL(url).catch(() => {});
   };
@@ -23,7 +25,7 @@ export default function AboutScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 }]}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </Pressable>

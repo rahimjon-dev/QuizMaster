@@ -10,11 +10,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import BottomTabBar from '../components/BottomTabBar';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const userName = user?.name || 'Foydalanuvchi';
   const userEmail = user?.email || '';
@@ -62,7 +64,7 @@ export default function ProfileScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.container}>
         {/* Top Header with Settings Gear Icon */}
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 }]}>
           <Text style={styles.headerTitle}>Profil</Text>
           <Pressable
             onPress={() => navigation.navigate('Settings')}

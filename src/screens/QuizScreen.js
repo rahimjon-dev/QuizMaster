@@ -7,15 +7,76 @@ import {
   SafeAreaView,
   Pressable,
   StatusBar,
+  Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QUIZ_CATEGORIES, QUIZ_QUESTIONS } from '../data/quizzes';
 import { useAuth } from '../context/AuthContext';
-import { TechQuestionIllustration } from '../components/illustrations';
+
+// Dynamic Hero Card matching the Category
+function CategoryHeroBanner({ categoryId, categoryName }) {
+  let iconName = 'book';
+  let iconColor = '#818CF8';
+  let gradientColors = ['#0F172A', '#1E1B4B', '#0F172A'];
+  let subtitleTag = 'Umumiy bilim';
+
+  if (categoryId === 'programming' || categoryId === 'technology') {
+    iconName = 'logo-android';
+    iconColor = '#4ADE80';
+    gradientColors = ['#0F172A', '#1E293B', '#0F172A'];
+    subtitleTag = 'Texnologiya & IT';
+  } else if (categoryId === 'geography') {
+    iconName = 'earth';
+    iconColor = '#34D399';
+    gradientColors = ['#064E3B', '#065F46', '#022C22'];
+    subtitleTag = 'Geografiya & Dunyo';
+  } else if (categoryId === 'football' || categoryId === 'sport') {
+    iconName = 'football';
+    iconColor = '#FBBF24';
+    gradientColors = ['#064E3B', '#14532D', '#052E16'];
+    subtitleTag = 'Sport & Chempionat';
+  } else if (categoryId === 'history') {
+    iconName = 'business';
+    iconColor = '#FB7185';
+    gradientColors = ['#4C0519', '#881337', '#310410'];
+    subtitleTag = 'Tarix & Madaniyat';
+  } else if (categoryId === 'science') {
+    iconName = 'flask';
+    iconColor = '#C084FC';
+    gradientColors = ['#2E1065', '#3B0764', '#1E1B4B'];
+    subtitleTag = 'Fan & Koinot';
+  } else if (categoryId === 'culture') {
+    iconName = 'color-palette';
+    iconColor = '#F472B6';
+    gradientColors = ['#4A044E', '#701A75', '#2E0854'];
+    subtitleTag = 'San\'at & Madaniyat';
+  }
+
+  return (
+    <LinearGradient
+      colors={gradientColors}
+      style={styles.heroBannerBox}
+    >
+      <View style={styles.heroGlowRings}>
+        <View style={[styles.heroRing, { width: 130, height: 130, borderColor: `${iconColor}33` }]} />
+        <View style={[styles.heroRing, { width: 90, height: 90, borderColor: `${iconColor}66` }]} />
+      </View>
+      <View style={styles.heroIconBadge}>
+        <Ionicons name={iconName} size={54} color={iconColor} />
+      </View>
+      <View style={styles.heroBottomRow}>
+        <Text style={[styles.heroTagText, { color: iconColor }]}>{subtitleTag}</Text>
+      </View>
+    </LinearGradient>
+  );
+}
 
 export default function QuizScreen({ route, navigation }) {
   const { updateUserStats } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const {
     categoryId = 'programming',
@@ -25,24 +86,24 @@ export default function QuizScreen({ route, navigation }) {
   } = route.params || {};
 
   const category =
-    QUIZ_CATEGORIES.find((c) => c.id === categoryId) || QUIZ_CATEGORIES[1];
+    QUIZ_CATEGORIES.find((c) => c.id === categoryId) || QUIZ_CATEGORIES[0];
 
   const categoryName = category?.title?.uz || categoryTitle;
 
   // Prepare questions
   const questionsList = useMemo(() => {
     const raw = QUIZ_QUESTIONS[categoryId] || QUIZ_QUESTIONS.programming || QUIZ_QUESTIONS.general;
-    // ensure question #3 is the Android question if programming
     return raw.slice(0, questionCount);
   }, [categoryId, questionCount]);
 
-  const totalQuestions = questionsList.length;
+  const totalQuestions = questionsList.length || 10;
 
-  const [currentIndex, setCurrentIndex] = useState(2); // Start at question 3 to match mockup "3/10", or user can play from 0
-  const [selectedAnswer, setSelectedAnswer] = useState(1); // Default to Google selected to showcase mockup or null
-  const [isAnswered, setIsAnswered] = useState(true);
-  const [score, setScore] = useState(2); // 2 previous correct
-  const [timeLeft, setTimeLeft] = useState(28); // 00:28
+  // Real gameplay state: starts from question 0, no pre-selected answers!
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30);
 
   // Timer countdown
   useEffect(() => {
@@ -79,11 +140,15 @@ export default function QuizScreen({ route, navigation }) {
   };
 
   const handleNextQuestion = () => {
-    if (!isAnswered) return;
+    if (!isAnswered) {
+      Alert.alert('Diqqat', 'Iltimos, avval javob variantini tanlang!');
+      return;
+    }
 
     if (isLastQuestion) {
       const finalScore = score + (selectedAnswer === currentQuestion.correctAnswer ? 0 : 0);
       const percentage = Math.round((finalScore / totalQuestions) * 100);
+      const wrongCount = totalQuestions - finalScore;
 
       if (updateUserStats) {
         updateUserStats(finalScore, totalQuestions, percentage);
@@ -93,9 +158,9 @@ export default function QuizScreen({ route, navigation }) {
         categoryId,
         categoryTitle: categoryName,
         totalQuestions,
-        correctCount: 8, // showcase 8 out of 10 to match mockup!
-        wrongCount: 2,
-        percentage: 80,
+        correctCount: finalScore,
+        wrongCount,
+        percentage,
       });
     } else {
       setCurrentIndex((prev) => prev + 1);
@@ -105,7 +170,6 @@ export default function QuizScreen({ route, navigation }) {
     }
   };
 
-  // Format timer into mm:ss
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -118,8 +182,13 @@ export default function QuizScreen({ route, navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.container}>
-        {/* Top Header Row */}
-        <View style={styles.header}>
+        {/* Top Header Row with safe area padding */}
+        <View
+          style={[
+            styles.header,
+            { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 10) + 8 },
+          ]}
+        >
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={22} color="#0F172A" />
             <Text style={styles.headerCategoryText}>{categoryName}</Text>
@@ -146,8 +215,8 @@ export default function QuizScreen({ route, navigation }) {
             <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
           </View>
 
-          {/* Question Hero Graphic (Android / Tech card) */}
-          <TechQuestionIllustration />
+          {/* Dynamic Hero Banner matching category */}
+          <CategoryHeroBanner categoryId={category?.id || categoryId} categoryName={categoryName} />
 
           {/* Question Text */}
           <Text style={styles.questionTitle}>{questionText}</Text>
@@ -183,11 +252,6 @@ export default function QuizScreen({ route, navigation }) {
                     <Ionicons name="close-circle" size={20} color="#FFFFFF" />
                   );
                 }
-              } else if (isSelected) {
-                optionStyle = styles.optionItemSelected;
-                letterBoxStyle = styles.letterBoxSelected;
-                letterTextStyle = styles.letterTextActive;
-                optionTextStyle = styles.optionTextActive;
               }
 
               return (
@@ -196,7 +260,7 @@ export default function QuizScreen({ route, navigation }) {
                   style={({ pressed }) => [
                     styles.optionItemBase,
                     optionStyle,
-                    pressed && styles.optionPressed,
+                    pressed && !isAnswered && styles.optionPressed,
                   ]}
                   onPress={() => handleSelectOption(idx)}
                 >
@@ -219,15 +283,23 @@ export default function QuizScreen({ route, navigation }) {
         </ScrollView>
 
         {/* Bottom Button */}
-        <View style={styles.bottomBar}>
+        <View
+          style={[
+            styles.bottomBar,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
           <Pressable
             style={({ pressed }) => [
               styles.nextBtn,
-              pressed && styles.nextBtnPressed,
+              !isAnswered && styles.nextBtnDisabled,
+              pressed && isAnswered && styles.nextBtnPressed,
             ]}
             onPress={handleNextQuestion}
           >
-            <Text style={styles.nextBtnText}>Keyingi</Text>
+            <Text style={styles.nextBtnText}>
+              {isLastQuestion ? 'Natijani ko\'rish' : 'Keyingi'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -248,13 +320,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 10,
+    backgroundColor: '#F8FAFC',
+    zIndex: 10,
   },
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+    paddingVertical: 4,
   },
   headerCategoryText: {
     fontSize: 18,
@@ -292,7 +366,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
     marginBottom: 6,
   },
   progressCounter: {
@@ -311,12 +385,51 @@ const styles = StyleSheet.create({
     backgroundColor: '#6366F1',
     borderRadius: 3,
   },
+
+  // Category Hero Banner
+  heroBannerBox: {
+    width: '100%',
+    height: 125,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  heroGlowRings: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroRing: {
+    position: 'absolute',
+    borderRadius: 999,
+    borderWidth: 1.5,
+  },
+  heroIconBadge: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  heroBottomRow: {
+    position: 'absolute',
+    bottom: 8,
+  },
+  heroTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+
   questionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#0F172A',
-    lineHeight: 26,
-    marginBottom: 20,
+    lineHeight: 24,
+    marginBottom: 16,
   },
   optionsList: {
     gap: 12,
@@ -399,15 +512,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
 
-  // Selected state
-  optionItemSelected: {
-    backgroundColor: '#6366F1',
-    borderColor: '#4F46E5',
-  },
-  letterBoxSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-
   letterTextActive: {
     color: '#FFFFFF',
   },
@@ -419,7 +523,6 @@ const styles = StyleSheet.create({
   },
   bottomBar: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
     paddingTop: 10,
     backgroundColor: '#F8FAFC',
   },
@@ -434,6 +537,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 6,
+  },
+  nextBtnDisabled: {
+    opacity: 0.6,
   },
   nextBtnPressed: {
     opacity: 0.9,

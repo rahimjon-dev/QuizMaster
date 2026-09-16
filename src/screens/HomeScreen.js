@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QUIZ_CATEGORIES } from '../data/quizzes';
 import { useAuth } from '../context/AuthContext';
 import BottomTabBar from '../components/BottomTabBar';
@@ -17,6 +18,7 @@ import { HomeBannerTrophy } from '../components/illustrations';
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const userName = user?.name ? user.name.split(' ')[0] : 'Foydalanuvchi';
 
   const handleStartDailyQuiz = () => {
@@ -41,7 +43,10 @@ export default function HomeScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.container}>
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 },
+          ]}
           showsVerticalScrollIndicator={false}
         >
           {/* Top Header */}
