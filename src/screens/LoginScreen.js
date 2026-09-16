@@ -21,15 +21,15 @@ export default function LoginScreen({ navigation }) {
   const { login, register } = useAuth();
 
   const [activeTab, setActiveTab] = useState('login'); // 'login' or 'register'
-  const [name, setName] = useState('Xusniddin Baxromjonov');
-  const [identifier, setIdentifier] = useState('xusniddin@example.com');
-  const [password, setPassword] = useState('123456');
+  const [name, setName] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
     if (!identifier.trim() || !password.trim()) {
-      Alert.alert('Xatolik', 'Iltimos, barcha maydonlarni to\'ldiring');
+      Alert.alert('Xatolik', 'Iltimos, telefon raqami / email va parolni kiriting.');
       return;
     }
 
@@ -37,7 +37,9 @@ export default function LoginScreen({ navigation }) {
     if (activeTab === 'login') {
       const result = await login(identifier, password);
       setLoading(false);
-      if (!result.success) {
+      if (result.success) {
+        navigation.replace('Home');
+      } else {
         Alert.alert('Kirishda xatolik', result.message || 'Email yoki parol noto\'g\'ri.');
       }
     } else {
@@ -48,17 +50,24 @@ export default function LoginScreen({ navigation }) {
       }
       const result = await register(name, identifier, password);
       setLoading(false);
-      if (!result.success) {
+      if (result.success) {
+        navigation.replace('Home');
+      } else {
         Alert.alert('Ro\'yxatdan o\'tishda xatolik', result.message || 'Xatolik yuz berdi.');
       }
     }
   };
 
-  const handleSocialLogin = (platform) => {
-    // Quick demo login
-    setName('Xusniddin Baxromjonov');
-    setIdentifier('xusniddin@example.com');
-    login('xusniddin@example.com', '123456');
+  const handleSocialLogin = async (platform) => {
+    setLoading(true);
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    const guestName = `${platform} Foydalanuvchisi`;
+    const guestId = `${platform.toLowerCase()}_${randomNum}@quizmaster.uz`;
+    const res = await register(guestName, guestId, '123456');
+    setLoading(false);
+    if (res.success) {
+      navigation.replace('Home');
+    }
   };
 
   return (
@@ -119,6 +128,7 @@ export default function LoginScreen({ navigation }) {
                   placeholderTextColor="#94A3B8"
                   value={name}
                   onChangeText={setName}
+                  autoCapitalize="words"
                 />
               </View>
             )}
@@ -172,7 +182,7 @@ export default function LoginScreen({ navigation }) {
               >
                 <Text style={styles.submitButtonText}>
                   {loading
-                    ? 'Tekshirilmoqda...'
+                    ? 'Bajarilmoqda...'
                     : activeTab === 'login'
                     ? 'Kirish'
                     : "Ro'yxatdan o'tish"}

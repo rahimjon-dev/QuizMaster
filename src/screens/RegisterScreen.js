@@ -46,7 +46,9 @@ export default function RegisterScreen({ navigation }) {
     const result = await register(name, email, password);
     setLoading(false);
 
-    if (!result.success) {
+    if (result.success) {
+      navigation.replace('Home');
+    } else {
       Alert.alert('Registration Failed', result.message || 'Could not register.');
     }
   };

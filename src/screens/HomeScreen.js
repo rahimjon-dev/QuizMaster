@@ -17,7 +17,7 @@ import { HomeBannerTrophy } from '../components/illustrations';
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
-  const userName = user?.name ? user.name.split(' ')[0] : 'Xusniddin';
+  const userName = user?.name ? user.name.split(' ')[0] : 'Foydalanuvchi';
 
   const handleStartDailyQuiz = () => {
     navigation.navigate('Quiz', {

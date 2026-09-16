@@ -16,8 +16,8 @@ import BottomTabBar from '../components/BottomTabBar';
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
 
-  const userName = user?.name || 'Xusniddin Baxromjonov';
-  const userEmail = user?.email || 'xusniddin@example.com';
+  const userName = user?.name || 'Foydalanuvchi';
+  const userEmail = user?.email || '';
 
   const menuItems = [
     {
@@ -43,6 +43,17 @@ export default function ProfileScreen({ navigation }) {
       title: 'Yordam',
       icon: 'help-circle-outline',
       onPress: () => navigation.navigate('About'),
+    },
+    {
+      id: 'logout',
+      title: 'Hisobdan chiqish',
+      icon: 'log-out-outline',
+      iconColor: '#EF4444',
+      titleColor: '#EF4444',
+      onPress: () => {
+        logout();
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      },
     },
   ];
 
@@ -113,10 +124,12 @@ export default function ProfileScreen({ navigation }) {
                 onPress={item.onPress}
               >
                 <View style={styles.menuItemLeft}>
-                  <View style={styles.menuIconCircle}>
-                    <Ionicons name={item.icon} size={20} color="#6366F1" />
+                  <View style={[styles.menuIconCircle, item.iconColor && { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name={item.icon} size={20} color={item.iconColor || '#6366F1'} />
                   </View>
-                  <Text style={styles.menuItemTitle}>{item.title}</Text>
+                  <Text style={[styles.menuItemTitle, item.titleColor && { color: item.titleColor }]}>
+                    {item.title}
+                  </Text>
                 </View>
 
                 <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
