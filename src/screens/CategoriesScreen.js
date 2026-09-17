@@ -16,11 +16,14 @@ import { QUIZ_CATEGORIES } from '../data/quizzes';
 import BottomTabBar from '../components/BottomTabBar';
 import { useTheme } from '../context/ThemeContext';
 import { playSound } from '../utils/audio';
+import LevelSelectorModal from '../components/LevelSelectorModal';
 
 export default function CategoriesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { theme, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isLevelModalVisible, setIsLevelModalVisible] = useState(false);
 
   const filteredCategories = QUIZ_CATEGORIES.filter((category) =>
     category.title.uz.toLowerCase().includes(searchQuery.toLowerCase().trim())
@@ -28,11 +31,17 @@ export default function CategoriesScreen({ navigation }) {
 
   const handleSelectCategory = (category) => {
     playSound('click');
+    setSelectedCategory(category);
+    setIsLevelModalVisible(true);
+  };
+
+  const handleStartQuizWithLevel = (catId, difficulty, questionCount) => {
+    setIsLevelModalVisible(false);
     navigation.navigate('Quiz', {
-      categoryId: category.id,
-      categoryTitle: category.title.uz,
-      difficulty: 'Easy',
-      questionCount: 10,
+      categoryId: catId,
+      categoryTitle: selectedCategory?.title?.uz || 'Viktorina',
+      difficulty,
+      questionCount: questionCount || 30,
     });
   };
 
@@ -118,6 +127,14 @@ export default function CategoriesScreen({ navigation }) {
 
         {/* Bottom Navigation Bar */}
         <BottomTabBar activeTab="categories" navigation={navigation} />
+
+        {/* Level and Question Count Selector Modal */}
+        <LevelSelectorModal
+          visible={isLevelModalVisible}
+          category={selectedCategory}
+          onClose={() => setIsLevelModalVisible(false)}
+          onStart={handleStartQuizWithLevel}
+        />
       </View>
     </SafeAreaView>
   );

@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import BottomTabBar from '../components/BottomTabBar';
 import { HomeBannerTrophy } from '../components/illustrations';
 import { playSound } from '../utils/audio';
+import LevelSelectorModal from '../components/LevelSelectorModal';
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
@@ -28,22 +29,29 @@ export default function HomeScreen({ navigation }) {
   const userInitial = (user?.name || 'R').charAt(0).toUpperCase();
   const userAvatar = user?.avatar;
 
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [isLevelModalVisible, setIsLevelModalVisible] = useState(false);
+
   const handleStartDailyQuiz = () => {
     playSound('click');
-    navigation.navigate('Quiz', {
-      categoryId: 'programming',
-      difficulty: 'Easy',
-      questionCount: 10,
-    });
+    const randomCat = QUIZ_CATEGORIES[Math.floor(Math.random() * QUIZ_CATEGORIES.length)];
+    setSelectedCategory(randomCat);
+    setIsLevelModalVisible(true);
   };
 
   const handleSelectCategory = (category) => {
     playSound('click');
+    setSelectedCategory(category);
+    setIsLevelModalVisible(true);
+  };
+
+  const handleStartQuizWithLevel = (catId, difficulty, questionCount) => {
+    setIsLevelModalVisible(false);
     navigation.navigate('Quiz', {
-      categoryId: category.id,
-      categoryTitle: category.title.uz,
-      difficulty: 'Easy',
-      questionCount: 10,
+      categoryId: catId,
+      categoryTitle: selectedCategory?.title?.uz || 'Viktorina',
+      difficulty,
+      questionCount: questionCount || 30,
     });
   };
 
@@ -192,6 +200,14 @@ export default function HomeScreen({ navigation }) {
 
         {/* Bottom Navigation Bar */}
         <BottomTabBar activeTab="home" navigation={navigation} />
+
+        {/* Level and Question Count Selector Modal */}
+        <LevelSelectorModal
+          visible={isLevelModalVisible}
+          category={selectedCategory}
+          onClose={() => setIsLevelModalVisible(false)}
+          onStart={handleStartQuizWithLevel}
+        />
       </View>
     </SafeAreaView>
   );

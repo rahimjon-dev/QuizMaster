@@ -9,69 +9,60 @@ import {
   StatusBar,
   Platform,
   Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { QUIZ_CATEGORIES, QUIZ_QUESTIONS } from '../data/quizzes';
+import { QUIZ_CATEGORIES } from '../data/quizzes';
 import { useAuth } from '../context/AuthContext';
 import { playSound } from '../utils/audio';
+import { getQuizQuestions } from '../data/questionEngine';
+import { getQuestionImageUrl } from '../utils/questionImages';
 
-// Dynamic Hero Card matching the Category
-function CategoryHeroBanner({ categoryId, categoryName }) {
-  let iconName = 'book';
-  let iconColor = '#818CF8';
-  let gradientColors = ['#0F172A', '#1E1B4B', '#0F172A'];
-  let subtitleTag = 'Umumiy bilim';
+// Dynamic Question Hero Banner showing image matched directly to the question
+function QuestionHeroBanner({ question, categoryId, categoryName, difficulty }) {
+  const imageUrl = getQuestionImageUrl(question, categoryId);
 
-  if (categoryId === 'programming' || categoryId === 'technology') {
-    iconName = 'logo-android';
-    iconColor = '#4ADE80';
-    gradientColors = ['#0F172A', '#1E293B', '#0F172A'];
-    subtitleTag = 'Texnologiya & IT';
-  } else if (categoryId === 'geography') {
-    iconName = 'earth';
-    iconColor = '#34D399';
-    gradientColors = ['#064E3B', '#065F46', '#022C22'];
-    subtitleTag = 'Geografiya & Dunyo';
-  } else if (categoryId === 'football' || categoryId === 'sport') {
-    iconName = 'football';
-    iconColor = '#FBBF24';
-    gradientColors = ['#064E3B', '#14532D', '#052E16'];
-    subtitleTag = 'Sport & Chempionat';
-  } else if (categoryId === 'history') {
-    iconName = 'business';
-    iconColor = '#FB7185';
-    gradientColors = ['#4C0519', '#881337', '#310410'];
-    subtitleTag = 'Tarix & Madaniyat';
-  } else if (categoryId === 'science') {
-    iconName = 'flask';
-    iconColor = '#C084FC';
-    gradientColors = ['#2E1065', '#3B0764', '#1E1B4B'];
-    subtitleTag = 'Fan & Koinot';
-  } else if (categoryId === 'culture') {
-    iconName = 'color-palette';
-    iconColor = '#F472B6';
-    gradientColors = ['#4A044E', '#701A75', '#2E0854'];
-    subtitleTag = 'San\'at & Madaniyat';
-  }
+  const diffBadge = {
+    Easy: { label: '🟢 Oson', bg: 'rgba(16, 185, 129, 0.9)' },
+    Medium: { label: '🟡 O\'rtacha', bg: 'rgba(245, 158, 11, 0.9)' },
+    Hard: { label: '🔴 Qiyin', bg: 'rgba(239, 68, 68, 0.9)' },
+  }[difficulty] || { label: '🟢 Oson', bg: 'rgba(16, 185, 129, 0.9)' };
 
   return (
-    <LinearGradient
-      colors={gradientColors}
-      style={styles.heroBannerBox}
-    >
-      <View style={styles.heroGlowRings}>
-        <View style={[styles.heroRing, { width: 130, height: 130, borderColor: `${iconColor}33` }]} />
-        <View style={[styles.heroRing, { width: 90, height: 90, borderColor: `${iconColor}66` }]} />
+    <View style={styles.heroBannerBox}>
+      {/* Real contextual photo matched to question keywords */}
+      <Image
+        source={{ uri: imageUrl }}
+        style={styles.heroBannerImage}
+        resizeMode="cover"
+      />
+
+      {/* Dark overlay for contrast */}
+      <LinearGradient
+        colors={['rgba(15, 23, 42, 0.25)', 'rgba(15, 23, 42, 0.85)']}
+        style={styles.heroImageOverlay}
+      />
+
+      {/* Top Badges */}
+      <View style={styles.heroTopRow}>
+        <View style={styles.heroCategoryPill}>
+          <Text style={styles.heroCategoryText}>{categoryName}</Text>
+        </View>
+        <View style={[styles.heroDiffPill, { backgroundColor: diffBadge.bg }]}>
+          <Text style={styles.heroDiffText}>{diffBadge.label}</Text>
+        </View>
       </View>
-      <View style={styles.heroIconBadge}>
-        <Ionicons name={iconName} size={54} color={iconColor} />
-      </View>
-      <View style={styles.heroBottomRow}>
-        <Text style={[styles.heroTagText, { color: iconColor }]}>{subtitleTag}</Text>
-      </View>
-    </LinearGradient>
+
+      {/* Bottom topic caption */}
+      {question?.topic ? (
+        <View style={styles.heroBottomRow}>
+          <Ionicons name="sparkles" size={13} color="#FBBF24" style={{ marginRight: 4 }} />
+          <Text style={styles.heroTagText}>{question.topic}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -80,10 +71,10 @@ export default function QuizScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
 
   const {
-    categoryId = 'programming',
-    categoryTitle = 'Texnologiya',
-    difficulty = 'Easy',
-    questionCount = 10,
+    categoryId = 'general',
+    categoryTitle = 'Umumiy bilim',
+    difficulty = 'Medium',
+    questionCount = 30,
   } = route.params || {};
 
   const category =
@@ -91,13 +82,12 @@ export default function QuizScreen({ route, navigation }) {
 
   const categoryName = category?.title?.uz || categoryTitle;
 
-  // Prepare questions
+  // Prepare questions: dynamic randomized selection of 30 questions from 1000+ pool!
   const questionsList = useMemo(() => {
-    const raw = QUIZ_QUESTIONS[categoryId] || QUIZ_QUESTIONS.programming || QUIZ_QUESTIONS.general;
-    return raw.slice(0, questionCount);
-  }, [categoryId, questionCount]);
+    return getQuizQuestions(categoryId, difficulty, questionCount || 30);
+  }, [categoryId, difficulty, questionCount]);
 
-  const totalQuestions = questionsList.length || 10;
+  const totalQuestions = questionsList.length || 30;
 
   // Real gameplay state: starts from question 0, no pre-selected answers!
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -219,8 +209,13 @@ export default function QuizScreen({ route, navigation }) {
             <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
           </View>
 
-          {/* Dynamic Hero Banner matching category */}
-          <CategoryHeroBanner categoryId={category?.id || categoryId} categoryName={categoryName} />
+          {/* Dynamic Question Hero Banner matching the question image */}
+          <QuestionHeroBanner
+            question={currentQuestion}
+            categoryId={category?.id || categoryId}
+            categoryName={categoryName}
+            difficulty={difficulty}
+          />
 
           {/* Question Text */}
           <Text style={styles.questionTitle}>{questionText}</Text>
@@ -390,42 +385,81 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 
-  // Category Hero Banner
+  // Question Hero Banner with matching contextual photo
   heroBannerBox: {
     width: '100%',
-    height: 125,
+    height: 145,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginVertical: 14,
     overflow: 'hidden',
     position: 'relative',
-  },
-  heroGlowRings: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroRing: {
-    position: 'absolute',
-    borderRadius: 999,
-    borderWidth: 1.5,
-  },
-  heroIconBadge: {
+    backgroundColor: '#0F172A',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  heroBannerImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  heroImageOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  heroTopRow: {
+    position: 'absolute',
+    top: 10,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroCategoryPill: {
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  heroCategoryText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  heroDiffPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  heroDiffText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   heroBottomRow: {
     position: 'absolute',
     bottom: 8,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
   },
   heroTagText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    color: '#F8FAFC',
+    letterSpacing: 0.3,
   },
 
   questionTitle: {
