@@ -14,9 +14,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QUIZ_CATEGORIES } from '../data/quizzes';
 import BottomTabBar from '../components/BottomTabBar';
+import { useTheme } from '../context/ThemeContext';
+import { playSound } from '../utils/audio';
 
 export default function CategoriesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { theme, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredCategories = QUIZ_CATEGORIES.filter((category) =>
@@ -24,6 +27,7 @@ export default function CategoriesScreen({ navigation }) {
   );
 
   const handleSelectCategory = (category) => {
+    playSound('click');
     navigation.navigate('Quiz', {
       categoryId: category.id,
       categoryTitle: category.title.uz,
@@ -33,31 +37,40 @@ export default function CategoriesScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
       <View style={styles.container}>
         {/* Top Header */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 }]}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#0F172A" />
+          <Pressable
+            onPress={() => {
+              playSound('click');
+              navigation.goBack();
+            }}
+            style={styles.backBtn}
+          >
+            <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>Kategoriyalar</Text>
+          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Kategoriyalar</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
 
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#94A3B8" style={styles.searchIcon} />
+        <View style={[styles.searchContainer, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+          <Ionicons name="search" size={20} color={theme.textMuted} style={styles.searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.textPrimary }]}
             placeholder="Kategoriyani nomini qidirish..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={theme.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
             <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              <Ionicons name="close-circle" size={18} color={theme.textMuted} />
             </Pressable>
           )}
         </View>
@@ -72,6 +85,10 @@ export default function CategoriesScreen({ navigation }) {
               key={category.id}
               style={({ pressed }) => [
                 styles.categoryItem,
+                {
+                  backgroundColor: theme.cardBg,
+                  borderColor: theme.cardBorder,
+                },
                 pressed && styles.categoryItemPressed,
               ]}
               onPress={() => handleSelectCategory(category)}
@@ -80,21 +97,21 @@ export default function CategoriesScreen({ navigation }) {
                 colors={category.gradient || [category.color, category.color]}
                 style={styles.iconBox}
               >
-                <Ionicons name={category.icon || 'book'} size={24} color="#FFFFFF" />
+                <Ionicons name={category.icon || 'bulb'} size={24} color="#FFFFFF" />
               </LinearGradient>
 
               <View style={styles.itemInfo}>
-                <Text style={styles.itemTitle}>{category.title.uz}</Text>
-                <Text style={styles.itemSubtitle}>{category.questionCount}</Text>
+                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>{category.title.uz}</Text>
+                <Text style={[styles.itemSubtitle, { color: theme.textSecondary }]}>{category.questionCount}</Text>
               </View>
 
-              <Ionicons name="chevron-forward" size={20} color="#CBD5E1" />
+              <Ionicons name="chevron-forward" size={20} color={theme.textMuted} />
             </Pressable>
           ))}
 
           {filteredCategories.length === 0 && (
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>Hech qanday toifa topilmadi</Text>
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>Hech qanday toifa topilmadi</Text>
             </View>
           )}
         </ScrollView>

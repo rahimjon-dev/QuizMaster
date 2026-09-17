@@ -1,8 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 
 export default function BottomTabBar({ activeTab = 'home', navigation }) {
+  const { theme, isDark } = useTheme();
+
   const tabs = [
     {
       id: 'home',
@@ -41,7 +44,15 @@ export default function BottomTabBar({ activeTab = 'home', navigation }) {
   };
 
   return (
-    <View style={styles.tabBarContainer}>
+    <View
+      style={[
+        styles.tabBarContainer,
+        {
+          backgroundColor: theme.tabBarBg,
+          borderTopColor: theme.tabBarBorder,
+        },
+      ]}
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
@@ -54,10 +65,17 @@ export default function BottomTabBar({ activeTab = 'home', navigation }) {
               <Ionicons
                 name={isActive ? tab.iconActive : tab.iconInactive}
                 size={22}
-                color={isActive ? '#6366F1' : '#94A3B8'}
+                color={isActive ? theme.accent : theme.textMuted}
               />
             </View>
-            <Text style={[styles.tabLabel, isActive ? styles.labelActive : styles.labelInactive]}>
+            <Text
+              style={[
+                styles.tabLabel,
+                isActive
+                  ? [styles.labelActive, { color: theme.accent }]
+                  : [styles.labelInactive, { color: theme.textMuted }],
+              ]}
+            >
               {tab.name}
             </Text>
           </Pressable>

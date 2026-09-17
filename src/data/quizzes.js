@@ -9,12 +9,13 @@ export const QUIZ_CATEGORIES = [
       uz: 'Umumiy bilim',
       ru: 'Общие знания',
     },
-    icon: 'book',
+    icon: 'bulb',
+    emoji: '💡',
     questionCount: '120 ta savol',
     totalQuestionsCount: 120,
     description: {
       en: 'Test your awareness of world facts, history, and records',
-      uz: 'Dunyoviy dalillar, tarix va rekordlar bo\'yicha bilimingizni sinang',
+      uz: 'Dunyoviy dalillar, intellekt va rekordlar bo\'yicha bilimingizni sinang',
       ru: 'Проверьте свои знания о мировых фактах, истории и рекордах',
     },
     difficulty: 'All Levels',
@@ -29,6 +30,7 @@ export const QUIZ_CATEGORIES = [
       ru: 'Технологии',
     },
     icon: 'hardware-chip',
+    emoji: '💻',
     questionCount: '98 ta savol',
     totalQuestionsCount: 98,
     description: {
@@ -48,6 +50,7 @@ export const QUIZ_CATEGORIES = [
       ru: 'Спорт',
     },
     icon: 'football',
+    emoji: '⚽',
     questionCount: '76 ta savol',
     totalQuestionsCount: 76,
     description: {
@@ -66,7 +69,8 @@ export const QUIZ_CATEGORIES = [
       uz: 'Tarix',
       ru: 'История',
     },
-    icon: 'business',
+    icon: 'hourglass',
+    emoji: '⏳',
     questionCount: '85 ta savol',
     totalQuestionsCount: 85,
     description: {
@@ -75,8 +79,8 @@ export const QUIZ_CATEGORIES = [
       ru: 'Древние империи, всемирная история и цивилизации',
     },
     difficulty: 'All Levels',
-    color: '#F43F5E',
-    gradient: ['#F43F5E', '#E11D48'],
+    color: '#F59E0B',
+    gradient: ['#F59E0B', '#D97706'],
   },
   {
     id: 'science',
@@ -86,6 +90,7 @@ export const QUIZ_CATEGORIES = [
       ru: 'Наука',
     },
     icon: 'flask',
+    emoji: '🔬',
     questionCount: '110 ta savol',
     totalQuestionsCount: 110,
     description: {
@@ -105,6 +110,7 @@ export const QUIZ_CATEGORIES = [
       ru: 'Культура',
     },
     icon: 'color-palette',
+    emoji: '🎨',
     questionCount: '69 ta savol',
     totalQuestionsCount: 69,
     description: {

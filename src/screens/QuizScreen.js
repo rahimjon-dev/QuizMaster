@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QUIZ_CATEGORIES, QUIZ_QUESTIONS } from '../data/quizzes';
 import { useAuth } from '../context/AuthContext';
+import { playSound } from '../utils/audio';
 
 // Dynamic Hero Card matching the Category
 function CategoryHeroBanner({ categoryId, categoryName }) {
@@ -135,7 +136,10 @@ export default function QuizScreen({ route, navigation }) {
     setIsAnswered(true);
 
     if (index === currentQuestion.correctAnswer) {
+      playSound('success');
       setScore((prev) => prev + 1);
+    } else {
+      playSound('wrong');
     }
   };
 

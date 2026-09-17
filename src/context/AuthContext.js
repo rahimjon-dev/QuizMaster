@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../services/supabase';
 import { generateToken, verifyToken } from '../utils/jwt';
+import { syncUserScoreToLeaderboard } from '../services/leaderboard';
 
 const USERS_DB_KEY = '@quizmaster_users_db_v1';
 const AUTH_TOKEN_KEY = '@quizmaster_jwt_token';
@@ -25,6 +26,8 @@ export const AuthProvider = ({ children }) => {
             id: session.user.id,
             name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'Player',
             email: session.user.email,
+            avatar: session.user.user_metadata?.avatar || '🦊',
+            bio: session.user.user_metadata?.bio || '',
             createdAt: new Date(session.user.created_at || Date.now()).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
@@ -38,7 +41,11 @@ export const AuthProvider = ({ children }) => {
               winRate: 0,
             },
           };
-          setUser((prev) => ({ ...supabaseUser, ...(prev?.id === supabaseUser.id ? prev : {}) }));
+          setUser((prev) => {
+            const merged = { ...supabaseUser, ...(prev?.id === supabaseUser.id ? prev : {}) };
+            syncUserScoreToLeaderboard(merged);
+            return merged;
+          });
           setToken(session.access_token);
           await AsyncStorage.setItem(AUTH_TOKEN_KEY, session.access_token);
           await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(supabaseUser));
@@ -66,6 +73,8 @@ export const AuthProvider = ({ children }) => {
           id: supaUser.id,
           name: supaUser.user_metadata?.name || supaUser.email?.split('@')[0] || 'Player',
           email: supaUser.email,
+          avatar: supaUser.user_metadata?.avatar || '🦊',
+          bio: supaUser.user_metadata?.bio || '',
           createdAt: new Date(supaUser.created_at || Date.now()).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -80,6 +89,7 @@ export const AuthProvider = ({ children }) => {
           },
         };
         setUser(formattedUser);
+        syncUserScoreToLeaderboard(formattedUser);
         setToken(sessionData.session.access_token);
         setIsLoading(false);
         return;
@@ -339,8 +349,65 @@ const normalizeIdentifier = (input) => {
       // Save to local session
       await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
       setUser(updatedUser);
+
+      // Sync to leaderboard immediately in real time
+      await syncUserScoreToLeaderboard(updatedUser);
     } catch (e) {
       console.error('Failed to update user stats:', e);
+    }
+  };
+
+  // Update user profile (name, avatar, bio) in real-time
+  const updateUserProfile = async ({ name, avatar, bio }) => {
+    if (!user) return { success: false, message: 'Foydalanuvchi tizimga kirmagan' };
+
+    try {
+      const updatedUser = {
+        ...user,
+        name: name !== undefined ? name.trim() : user.name,
+        avatar: avatar !== undefined ? avatar : (user.avatar || '🦊'),
+        bio: bio !== undefined ? bio.trim() : (user.bio || ''),
+      };
+
+      // 1. Update React state immediately
+      setUser(updatedUser);
+
+      // 2. Save to local AsyncStorage session
+      await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+
+      // 3. Update in local users registry
+      try {
+        const usersJson = await AsyncStorage.getItem(USERS_DB_KEY);
+        const users = usersJson ? JSON.parse(usersJson) : [];
+        const index = users.findIndex((u) => u.id === user.id || u.email === user.email);
+        if (index >= 0) {
+          users[index] = { ...users[index], ...updatedUser };
+          await AsyncStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
+        }
+      } catch (e) {
+        console.log('Local users registry update note:', e);
+      }
+
+      // 4. Sync with Supabase Auth metadata
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            name: updatedUser.name,
+            avatar: updatedUser.avatar,
+            bio: updatedUser.bio,
+          },
+        });
+      } catch (e) {
+        console.log('Supabase user metadata sync note:', e);
+      }
+
+      // 5. Update real-time leaderboard
+      await syncUserScoreToLeaderboard(updatedUser);
+
+      return { success: true };
+    } catch (e) {
+      console.error('Failed to update profile:', e);
+      return { success: false, message: e.message };
     }
   };
 
@@ -354,6 +421,7 @@ const normalizeIdentifier = (input) => {
         register,
         logout,
         updateUserStats,
+        updateUserProfile,
       }}
     >
       {children}

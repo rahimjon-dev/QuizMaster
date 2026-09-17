@@ -6,6 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import AppNavigator from './src/navigation/AppNavigator';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { AuthProvider } from './src/context/AuthContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 
 // Disable distracting warning popups on mobile screens
 LogBox.ignoreAllLogs(true);
@@ -13,14 +14,16 @@ LogBox.ignoreAllLogs(true);
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <NavigationContainer>
-            <StatusBar style="auto" />
-            <AppNavigator />
-          </NavigationContainer>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <NavigationContainer>
+              <StatusBar style="auto" />
+              <AppNavigator />
+            </NavigationContainer>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
