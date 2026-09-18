@@ -17,7 +17,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import BottomTabBar from '../components/BottomTabBar';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
-import { playSound, isSoundEnabled, setSoundEnabled } from '../utils/audio';
+import {
+  playSound,
+  isSoundEnabled,
+  setSoundEnabled,
+  isMusicEnabled,
+  setMusicEnabled,
+  stopMillionaireMusic,
+} from '../utils/audio';
 
 const NOTIFICATIONS_KEY = '@quizmaster_notifications_enabled';
 
@@ -28,6 +35,7 @@ export default function SettingsScreen({ navigation }) {
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundsEnabledState, setSoundsEnabledState] = useState(true);
+  const [musicEnabledState, setMusicEnabledState] = useState(true);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
@@ -39,6 +47,9 @@ export default function SettingsScreen({ navigation }) {
     try {
       const soundVal = await isSoundEnabled();
       setSoundsEnabledState(soundVal);
+
+      const musicVal = await isMusicEnabled();
+      setMusicEnabledState(musicVal);
 
       const notifVal = await AsyncStorage.getItem(NOTIFICATIONS_KEY);
       if (notifVal !== null) {
@@ -54,6 +65,16 @@ export default function SettingsScreen({ navigation }) {
     await setSoundEnabled(value);
     if (value) {
       playSound('toggle');
+    }
+  };
+
+  const handleToggleMusic = async (value) => {
+    setMusicEnabledState(value);
+    await setMusicEnabled(value);
+    if (value) {
+      playSound('toggle');
+    } else {
+      stopMillionaireMusic();
     }
   };
 
@@ -179,6 +200,22 @@ export default function SettingsScreen({ navigation }) {
                 onValueChange={handleToggleSounds}
                 trackColor={{ false: '#CBD5E1', true: '#818CF8' }}
                 thumbColor={soundsEnabledState ? '#6366F1' : '#F1F5F9'}
+              />
+            </View>
+
+            {/* 4. Fon musiqasi (Switch) */}
+            <View style={[styles.item, { borderBottomColor: theme.divider }]}>
+              <View style={styles.itemLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#EDE9FE' }]}>
+                  <Ionicons name="musical-notes-outline" size={20} color="#7C3AED" />
+                </View>
+                <Text style={[styles.itemTitle, { color: theme.textPrimary }]}>Fon musiqasi</Text>
+              </View>
+              <Switch
+                value={musicEnabledState}
+                onValueChange={handleToggleMusic}
+                trackColor={{ false: '#CBD5E1', true: '#818CF8' }}
+                thumbColor={musicEnabledState ? '#6366F1' : '#F1F5F9'}
               />
             </View>
 
