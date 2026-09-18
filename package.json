@@ -23,7 +23,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web"
+    "build": "expo export --platform web",
+    "build:apk": "eas build -p android --profile preview"
   },
   "private": true,
   "devDependencies": {
