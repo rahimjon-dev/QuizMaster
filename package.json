@@ -11,6 +11,7 @@
     "expo": "~57.0.23",
     "expo-linear-gradient": "~57.0.2",
     "expo-status-bar": "~57.0.1",
+    "expo-updates": "~57.0.23",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -24,7 +25,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "expo export --platform web",
-    "build:apk": "npx eas-cli build -p android --profile preview"
+    "build:apk": "npx eas-cli build -p android --profile preview",
+    "update": "npx eas-cli update --channel preview --auto",
+    "update:prod": "npx eas-cli update --channel production --auto"
   },
   "private": true,
   "devDependencies": {

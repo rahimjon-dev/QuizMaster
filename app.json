@@ -26,6 +26,12 @@
         "projectId": "bc7f6e63-e7e9-4e97-a55d-795303ed7408"
       }
     },
-    "owner": "rahimjon123"
+    "owner": "rahimjon123",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/bc7f6e63-e7e9-4e97-a55d-795303ed7408"
+    }
   }
 }
