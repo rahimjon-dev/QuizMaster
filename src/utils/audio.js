@@ -4,6 +4,27 @@ import { Platform } from 'react-native';
 const SOUND_STORAGE_KEY = '@quizmaster_sound_enabled';
 const MUSIC_STORAGE_KEY = '@quizmaster_music_enabled';
 
+// Audio assets with dual strategy: local path + fast CDN backup
+const AUDIO_SOURCES = {
+  suspense: [
+    '/assets/audio/suspense.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2431/2431-preview.mp3',
+  ],
+  correct: [
+    '/assets/audio/correct.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  ],
+  wrong: [
+    '/assets/audio/wrong.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2955/2955-preview.mp3',
+  ],
+  click: [
+    '/assets/audio/click.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+  ],
+};
+
+let bgMusicAudio = null;
 let audioContext = null;
 
 const getAudioContext = () => {
@@ -15,7 +36,7 @@ const getAudioContext = () => {
       }
     }
     if (audioContext && audioContext.state === 'suspended') {
-      audioContext.resume();
+      audioContext.resume().catch(() => {});
     }
   }
   return audioContext;
@@ -59,13 +80,44 @@ export const setMusicEnabled = async (enabled) => {
 };
 
 /**
- * Play a synthesized sound frequency pattern using Web Audio API
- * @param {'click' | 'success' | 'wrong' | 'toggle'} type
+ * Play a high quality sound effect (Correct, Wrong, Click, Toggle)
+ * Uses HTML5 Audio with Web Audio API fallback
+ * @param {'click' | 'correct' | 'success' | 'wrong' | 'toggle'} type
  */
 export const playSound = async (type = 'click') => {
   const enabled = await isSoundEnabled();
   if (!enabled) return;
 
+  const resolvedType = type === 'success' ? 'correct' : type;
+
+  // 1. Try HTML5 Audio in Web / Browser
+  if (typeof window !== 'undefined' && typeof window.Audio !== 'undefined') {
+    const sources = AUDIO_SOURCES[resolvedType] || AUDIO_SOURCES.click;
+    let played = false;
+
+    for (const src of sources) {
+      try {
+        const audio = new window.Audio(src);
+        audio.volume = resolvedType === 'correct' ? 0.75 : resolvedType === 'wrong' ? 0.65 : 0.45;
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          await playPromise;
+          played = true;
+          break;
+        }
+      } catch (e) {
+        // Try next source
+      }
+    }
+
+    if (played) return;
+  }
+
+  // 2. Synthesized fallback via Web Audio API if HTML5 audio cannot play
+  playSynthesizedFallback(resolvedType);
+};
+
+function playSynthesizedFallback(type) {
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -73,214 +125,113 @@ export const playSound = async (type = 'click') => {
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
     osc.connect(gain);
     gain.connect(ctx.destination);
 
-    if (type === 'click') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
-      osc.start(now);
-      osc.stop(now + 0.05);
-    } else if (type === 'toggle') {
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, now);
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
-      osc.start(now);
-      osc.stop(now + 0.12);
-    } else if (type === 'success') {
-      // Pleasant high chime
+    if (type === 'correct') {
+      // High triumph arpeggio (C5 -> E5 -> G5 -> C6)
       const osc2 = ctx.createOscillator();
       const gain2 = ctx.createGain();
       osc2.connect(gain2);
       gain2.connect(ctx.destination);
 
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, now); // C5
-      osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(659.25, now + 0.1);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
 
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(783.99, now + 0.15); // G5
-      gain2.gain.setValueAtTime(0.2, now + 0.15);
-      gain2.gain.linearRampToValueAtTime(0.01, now + 0.4);
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(783.99, now + 0.15);
+      osc2.frequency.setValueAtTime(1046.5, now + 0.25);
+      gain2.gain.setValueAtTime(0.25, now + 0.15);
+      gain2.gain.linearRampToValueAtTime(0.01, now + 0.55);
 
       osc.start(now);
-      osc.stop(now + 0.3);
+      osc.stop(now + 0.4);
       osc2.start(now + 0.15);
-      osc2.stop(now + 0.4);
+      osc2.stop(now + 0.55);
     } else if (type === 'wrong') {
+      // Low buzzer / dissonance (F#2 + G2 buzzer)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(250, now);
-      osc.frequency.exponentialRampToValueAtTime(150, now + 0.2);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+      osc.frequency.setValueAtTime(185, now);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(196, now); // Dissonant half-step
+      gain2.gain.setValueAtTime(0.25, now);
+      gain2.gain.linearRampToValueAtTime(0.01, now + 0.35);
+
       osc.start(now);
-      osc.stop(now + 0.2);
+      osc.stop(now + 0.35);
+      osc2.start(now);
+      osc2.stop(now + 0.35);
+    } else {
+      // Tap / click
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(650, now);
+      osc.frequency.exponentialRampToValueAtTime(850, now + 0.04);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
+      osc.start(now);
+      osc.stop(now + 0.04);
     }
-  } catch (e) {
-    // Audio playback error can be safely ignored
-  }
-};
+  } catch (e) {}
+}
 
 // -------------------------------------------------------------
-// "KIM MILLIONER BO'LMOQCHI" (MILLIONAIRE) SUSPENSE MUSIC ENGINE
+// SUSPENSE QUIZ BACKGROUND MUSIC (REAL AUDIO TRACK)
 // -------------------------------------------------------------
-
-let millionaireMusicState = {
-  isPlaying: false,
-  gainNode: null,
-  droneOsc: null,
-  padOsc1: null,
-  padOsc2: null,
-  pulseInterval: null,
-};
 
 /**
- * Starts the dramatic "Kim millioner bo'lmoqchi" suspense soundtrack:
- * 1. Deep sub-bass tension drone
- * 2. Second-by-second heartbeat / countdown clock tick
- * 3. Atmospheric minor harmonics
+ * Starts real suspense quiz music track in a smooth loop
  */
 export const startMillionaireMusic = async () => {
   const enabled = await isMusicEnabled();
   if (!enabled) return;
 
-  const ctx = getAudioContext();
-  if (!ctx) return;
+  if (typeof window !== 'undefined' && typeof window.Audio !== 'undefined') {
+    try {
+      if (!bgMusicAudio) {
+        // Try local file first, then CDN
+        bgMusicAudio = new window.Audio(AUDIO_SOURCES.suspense[0]);
+        bgMusicAudio.loop = true;
+        bgMusicAudio.volume = 0.35;
 
-  if (millionaireMusicState.isPlaying) return;
+        // If local file errors, switch to CDN
+        bgMusicAudio.onerror = () => {
+          if (bgMusicAudio) {
+            bgMusicAudio.src = AUDIO_SOURCES.suspense[1];
+            bgMusicAudio.play().catch(() => {});
+          }
+        };
+      }
 
-  try {
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(0.001, ctx.currentTime);
-    masterGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 1.2);
-    masterGain.connect(ctx.destination);
-
-    // 1. Deep Sub-bass Suspense Drone (73.4Hz D2)
-    const droneOsc = ctx.createOscillator();
-    const droneFilter = ctx.createBiquadFilter();
-    droneFilter.type = 'lowpass';
-    droneFilter.frequency.setValueAtTime(140, ctx.currentTime);
-
-    droneOsc.type = 'sawtooth';
-    droneOsc.frequency.setValueAtTime(73.42, ctx.currentTime);
-    droneOsc.connect(droneFilter);
-    droneFilter.connect(masterGain);
-    droneOsc.start();
-
-    // 2. Ambient Tension Pad (Minor suspense harmony)
-    const padOsc1 = ctx.createOscillator();
-    const padOsc2 = ctx.createOscillator();
-    const padFilter = ctx.createBiquadFilter();
-    padFilter.type = 'bandpass';
-    padFilter.frequency.setValueAtTime(320, ctx.currentTime);
-    padFilter.Q.setValueAtTime(3, ctx.currentTime);
-
-    padOsc1.type = 'sine';
-    padOsc1.frequency.setValueAtTime(146.83, ctx.currentTime); // D3
-    padOsc2.type = 'sine';
-    padOsc2.frequency.setValueAtTime(155.56, ctx.currentTime); // Eb3 tension half-step
-
-    padOsc1.connect(padFilter);
-    padOsc2.connect(padFilter);
-    padFilter.connect(masterGain);
-    padOsc1.start();
-    padOsc2.start();
-
-    // 3. Heartbeat & Clock Countdown Tension Pulse (every 1 second)
-    const playTensionBeat = () => {
-      if (!millionaireMusicState.isPlaying) return;
-      try {
-        const beatNow = ctx.currentTime;
-        const kickOsc = ctx.createOscillator();
-        const kickGain = ctx.createGain();
-
-        kickOsc.type = 'sine';
-        kickOsc.frequency.setValueAtTime(95, beatNow);
-        kickOsc.frequency.exponentialRampToValueAtTime(38, beatNow + 0.12);
-
-        kickGain.gain.setValueAtTime(0.26, beatNow);
-        kickGain.gain.exponentialRampToValueAtTime(0.001, beatNow + 0.14);
-
-        kickOsc.connect(kickGain);
-        kickGain.connect(ctx.destination);
-
-        kickOsc.start(beatNow);
-        kickOsc.stop(beatNow + 0.15);
-
-        // High subtle clock tick
-        const tickOsc = ctx.createOscillator();
-        const tickGain = ctx.createGain();
-        tickOsc.type = 'triangle';
-        tickOsc.frequency.setValueAtTime(800, beatNow + 0.02);
-        tickOsc.frequency.exponentialRampToValueAtTime(400, beatNow + 0.06);
-
-        tickGain.gain.setValueAtTime(0.06, beatNow + 0.02);
-        tickGain.gain.linearRampToValueAtTime(0.001, beatNow + 0.07);
-
-        tickOsc.connect(tickGain);
-        tickGain.connect(ctx.destination);
-
-        tickOsc.start(beatNow + 0.02);
-        tickOsc.stop(beatNow + 0.08);
-      } catch (e) {}
-    };
-
-    playTensionBeat();
-    const pulseInterval = setInterval(playTensionBeat, 1000);
-
-    millionaireMusicState = {
-      isPlaying: true,
-      gainNode: masterGain,
-      droneOsc,
-      padOsc1,
-      padOsc2,
-      pulseInterval,
-    };
-  } catch (e) {
-    console.warn('Suspense music error:', e);
+      bgMusicAudio.volume = 0.35;
+      bgMusicAudio.play().catch((err) => {
+        console.log('Background music play note:', err.message);
+      });
+      return;
+    } catch (e) {
+      console.warn('HTML5 music note:', e);
+    }
   }
 };
 
+/**
+ * Stops or pauses suspense background music
+ */
 export const stopMillionaireMusic = () => {
-  if (!millionaireMusicState.isPlaying) return;
-
   try {
-    const ctx = getAudioContext();
-    if (ctx && millionaireMusicState.gainNode) {
-      millionaireMusicState.gainNode.gain.linearRampToValueAtTime(
-        0.001,
-        ctx.currentTime + 0.25
-      );
+    if (bgMusicAudio) {
+      bgMusicAudio.pause();
+      bgMusicAudio.currentTime = 0;
     }
-
-    if (millionaireMusicState.pulseInterval) {
-      clearInterval(millionaireMusicState.pulseInterval);
-    }
-
-    setTimeout(() => {
-      try {
-        if (millionaireMusicState.droneOsc) millionaireMusicState.droneOsc.stop();
-        if (millionaireMusicState.padOsc1) millionaireMusicState.padOsc1.stop();
-        if (millionaireMusicState.padOsc2) millionaireMusicState.padOsc2.stop();
-      } catch {}
-      millionaireMusicState = {
-        isPlaying: false,
-        gainNode: null,
-        droneOsc: null,
-        padOsc1: null,
-        padOsc2: null,
-        pulseInterval: null,
-      };
-    }, 300);
-  } catch (e) {
-    millionaireMusicState.isPlaying = false;
-  }
+  } catch (e) {}
 };

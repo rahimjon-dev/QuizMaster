@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "npx expo export --platform web || echo 'Using prebuilt dist'",
+  "buildCommand": "npx expo export --platform web && mkdir -p dist/assets/audio && cp -r assets/audio/* dist/assets/audio/ || echo 'Using prebuilt dist'",
   "outputDirectory": "dist",
   "framework": null,
   "rewrites": [

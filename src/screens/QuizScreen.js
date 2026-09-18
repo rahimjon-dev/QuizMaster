@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   Alert,
   Image,
+  Animated,
+  Easing,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,6 +69,120 @@ function QuestionHeroBanner({ question, categoryId, categoryName, difficulty }) 
   );
 }
 
+// Animated Option Card with spring touch feedback and smooth staggered entrance
+function AnimatedOptionCard({
+  letter,
+  option,
+  idx,
+  questionKey,
+  isSelected,
+  isCorrect,
+  isAnswered,
+  theme,
+  isDark,
+  onSelect,
+}) {
+  const animFade = useRef(new Animated.Value(0)).current;
+  const animSlide = useRef(new Animated.Value(20)).current;
+  const animScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    animFade.setValue(0);
+    animSlide.setValue(20);
+    const delay = idx * 60; // 0ms, 60ms, 120ms, 180ms smooth stagger
+    const timer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(animFade, {
+          toValue: 1,
+          duration: 320,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(animSlide, {
+          toValue: 0,
+          duration: 320,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [questionKey, idx, animFade, animSlide]);
+
+  const handlePressIn = () => {
+    if (isAnswered) return;
+    Animated.spring(animScale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(animScale, {
+      toValue: 1,
+      friction: 4,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  let optionBg = theme.cardBg;
+  let optionBorder = theme.cardBorder;
+  let letterBoxBg = isDark ? '#334155' : '#F1F5F9';
+  let letterColor = theme.textPrimary;
+  let textColor = theme.textPrimary;
+  let statusIcon = null;
+
+  if (isAnswered) {
+    if (isCorrect) {
+      optionBg = isDark ? 'rgba(16, 185, 129, 0.25)' : '#ECFDF5';
+      optionBorder = '#10B981';
+      letterBoxBg = '#10B981';
+      letterColor = '#FFFFFF';
+      textColor = isDark ? '#A7F3D0' : '#065F46';
+      statusIcon = <Ionicons name="checkmark-circle" size={22} color="#10B981" />;
+    } else if (isSelected && !isCorrect) {
+      optionBg = isDark ? 'rgba(239, 68, 68, 0.25)' : '#FEF2F2';
+      optionBorder = '#EF4444';
+      letterBoxBg = '#EF4444';
+      letterColor = '#FFFFFF';
+      textColor = isDark ? '#FECACA' : '#991B1B';
+      statusIcon = <Ionicons name="close-circle" size={22} color="#EF4444" />;
+    }
+  }
+
+  return (
+    <Animated.View
+      style={{
+        opacity: animFade,
+        transform: [{ translateY: animSlide }, { scale: animScale }],
+      }}
+    >
+      <Pressable
+        style={[
+          styles.optionItemBase,
+          {
+            backgroundColor: optionBg,
+            borderColor: optionBorder,
+          },
+        ]}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={() => onSelect(idx)}
+      >
+        <View style={styles.optionLeft}>
+          <View style={[styles.letterBoxBase, { backgroundColor: letterBoxBg }]}>
+            <Text style={[styles.letterTextBase, { color: letterColor }]}>{letter}</Text>
+          </View>
+          <Text style={[styles.optionTextBase, { color: textColor }]}>{option}</Text>
+        </View>
+        {statusIcon && <View style={styles.statusIconBox}>{statusIcon}</View>}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function QuizScreen({ route, navigation }) {
   const { updateUserStats } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
@@ -97,7 +213,30 @@ export default function QuizScreen({ route, navigation }) {
   const [timeLeft, setTimeLeft] = useState(30);
   const [musicActive, setMusicActive] = useState(true);
 
-  // Initialize and manage "Kim millioner bo'lmoqchi" suspense music
+  // Smooth question container transition on every question index change
+  const questionFade = useRef(new Animated.Value(0)).current;
+  const questionSlide = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    questionFade.setValue(0);
+    questionSlide.setValue(20);
+    Animated.parallel([
+      Animated.timing(questionFade, {
+        toValue: 1,
+        duration: 380,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(questionSlide, {
+        toValue: 0,
+        duration: 380,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [currentIndex, questionFade, questionSlide]);
+
+  // Initialize and manage suspense background music
   useEffect(() => {
     let isMounted = true;
     isMusicEnabled().then((enabled) => {
@@ -132,7 +271,7 @@ export default function QuizScreen({ route, navigation }) {
   }, [timeLeft, isAnswered]);
 
   const handleToggleMusic = async () => {
-    playSound('toggle');
+    playSound('click');
     const nextState = !musicActive;
     setMusicActive(nextState);
     await setMusicEnabled(nextState);
@@ -144,7 +283,7 @@ export default function QuizScreen({ route, navigation }) {
   };
 
   const handleToggleTheme = () => {
-    playSound('toggle');
+    playSound('click');
     toggleTheme();
   };
 
@@ -177,10 +316,10 @@ export default function QuizScreen({ route, navigation }) {
     stopMillionaireMusic();
 
     if (index === currentQuestion.correctAnswer) {
-      playSound('success');
+      playSound('correct'); // distinct triumph chime
       setScore((prev) => prev + 1);
     } else {
-      playSound('wrong');
+      playSound('wrong'); // distinct error buzzer
     }
   };
 
@@ -189,6 +328,7 @@ export default function QuizScreen({ route, navigation }) {
       Alert.alert('Diqqat', 'Iltimos, avval javob variantini tanlang!');
       return;
     }
+    playSound('click');
 
     if (isLastQuestion) {
       stopMillionaireMusic();
@@ -262,7 +402,7 @@ export default function QuizScreen({ route, navigation }) {
 
           {/* Right Action Controls: Music, Theme, Timer */}
           <View style={styles.headerRightActions}>
-            {/* Suspense Music Toggle ("Kim millioner bo'lmoqchi") */}
+            {/* Suspense Music Toggle */}
             <Pressable
               onPress={handleToggleMusic}
               style={[
@@ -351,84 +491,51 @@ export default function QuizScreen({ route, navigation }) {
             />
           </View>
 
-          {/* Dynamic Question Hero Banner */}
-          <QuestionHeroBanner
-            question={currentQuestion}
-            categoryId={category?.id || categoryId}
-            categoryName={categoryName}
-            difficulty={difficulty}
-          />
+          {/* Smooth animated question wrapper for transition on each question */}
+          <Animated.View
+            style={{
+              opacity: questionFade,
+              transform: [{ translateY: questionSlide }],
+            }}
+          >
+            {/* Dynamic Question Hero Banner */}
+            <QuestionHeroBanner
+              question={currentQuestion}
+              categoryId={category?.id || categoryId}
+              categoryName={categoryName}
+              difficulty={difficulty}
+            />
 
-          {/* Question Text */}
-          <Text style={[styles.questionTitle, { color: theme.textPrimary }]}>
-            {questionText}
-          </Text>
+            {/* Question Text */}
+            <Text style={[styles.questionTitle, { color: theme.textPrimary }]}>
+              {questionText}
+            </Text>
 
-          {/* Options List */}
-          <View style={styles.optionsList}>
-            {optionsList.map((option, idx) => {
-              const letter = optionLetters[idx] || `${idx + 1}`;
-              const isSelected = selectedAnswer === idx;
-              const isCorrect = idx === currentQuestion.correctAnswer;
+            {/* Animated Options List with press spring and staggered entrance */}
+            <View style={styles.optionsList}>
+              {optionsList.map((option, idx) => {
+                const letter = optionLetters[idx] || `${idx + 1}`;
+                const isSelected = selectedAnswer === idx;
+                const isCorrect = idx === currentQuestion.correctAnswer;
 
-              let optionBg = theme.cardBg;
-              let optionBorder = theme.cardBorder;
-              let letterBoxBg = isDark ? '#334155' : '#F1F5F9';
-              let letterColor = theme.textPrimary;
-              let textColor = theme.textPrimary;
-              let statusIcon = null;
-
-              if (isAnswered) {
-                if (isCorrect) {
-                  optionBg = isDark ? 'rgba(16, 185, 129, 0.25)' : '#ECFDF5';
-                  optionBorder = '#10B981';
-                  letterBoxBg = '#10B981';
-                  letterColor = '#FFFFFF';
-                  textColor = isDark ? '#A7F3D0' : '#065F46';
-                  statusIcon = (
-                    <Ionicons name="checkmark-circle" size={22} color="#10B981" />
-                  );
-                } else if (isSelected && !isCorrect) {
-                  optionBg = isDark ? 'rgba(239, 68, 68, 0.25)' : '#FEF2F2';
-                  optionBorder = '#EF4444';
-                  letterBoxBg = '#EF4444';
-                  letterColor = '#FFFFFF';
-                  textColor = isDark ? '#FECACA' : '#991B1B';
-                  statusIcon = (
-                    <Ionicons name="close-circle" size={22} color="#EF4444" />
-                  );
-                }
-              }
-
-              return (
-                <Pressable
-                  key={idx}
-                  style={({ pressed }) => [
-                    styles.optionItemBase,
-                    {
-                      backgroundColor: optionBg,
-                      borderColor: optionBorder,
-                    },
-                    pressed && !isAnswered && styles.optionPressed,
-                  ]}
-                  onPress={() => handleSelectOption(idx)}
-                >
-                  <View style={styles.optionLeft}>
-                    <View style={[styles.letterBoxBase, { backgroundColor: letterBoxBg }]}>
-                      <Text style={[styles.letterTextBase, { color: letterColor }]}>
-                        {letter}
-                      </Text>
-                    </View>
-                    <Text style={[styles.optionTextBase, { color: textColor }]}>
-                      {option}
-                    </Text>
-                  </View>
-
-                  {statusIcon && <View style={styles.statusIconBox}>{statusIcon}</View>}
-                </Pressable>
-              );
-            })}
-          </View>
+                return (
+                  <AnimatedOptionCard
+                    key={`${currentIndex}_opt_${idx}`}
+                    questionKey={currentIndex}
+                    idx={idx}
+                    letter={letter}
+                    option={option}
+                    isSelected={isSelected}
+                    isCorrect={isCorrect}
+                    isAnswered={isAnswered}
+                    theme={theme}
+                    isDark={isDark}
+                    onSelect={handleSelectOption}
+                  />
+                );
+              })}
+            </View>
+          </Animated.View>
         </ScrollView>
 
         {/* Bottom Button */}
@@ -632,9 +739,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 1,
-  },
-  optionPressed: {
-    transform: [{ scale: 0.98 }],
   },
   optionLeft: {
     flexDirection: 'row',

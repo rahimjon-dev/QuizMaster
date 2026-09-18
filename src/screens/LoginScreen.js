@@ -13,7 +13,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { QuizMasterLogo } from '../components/illustrations';
@@ -70,18 +70,6 @@ export default function LoginScreen({ route, navigation }) {
   const handleDemoLogin = async () => {
     setLoading(true);
     const res = await login('demo@quizmaster.uz', '123456');
-    setLoading(false);
-    if (res.success) {
-      navigation.replace('Home');
-    }
-  };
-
-  const handleSocialLogin = async (platform) => {
-    setLoading(true);
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    const guestName = `${platform} Foydalanuvchisi`;
-    const guestId = `${platform.toLowerCase()}_${randomNum}@quizmaster.uz`;
-    const res = await register(guestName, guestId, '123456');
     setLoading(false);
     if (res.success) {
       navigation.replace('Home');
@@ -255,40 +243,6 @@ export default function LoginScreen({ route, navigation }) {
             >
               <Text style={styles.demoButtonText}>⚡ Tezkor sinov (Demo kirish)</Text>
             </Pressable>
-
-            {/* Divider "Yoki" */}
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Yoki</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Logins */}
-            <View style={styles.socialRow}>
-              {/* Google */}
-              <Pressable
-                style={styles.socialBtn}
-                onPress={() => handleSocialLogin('Google')}
-              >
-                <FontAwesome5 name="google" size={18} color="#EA4335" />
-              </Pressable>
-
-              {/* Apple */}
-              <Pressable
-                style={styles.socialBtn}
-                onPress={() => handleSocialLogin('Apple')}
-              >
-                <Ionicons name="logo-apple" size={22} color="#000000" />
-              </Pressable>
-
-              {/* Telegram */}
-              <Pressable
-                style={styles.socialBtn}
-                onPress={() => handleSocialLogin('Telegram')}
-              >
-                <FontAwesome5 name="telegram-plane" size={20} color="#229ED9" />
-              </Pressable>
-            </View>
 
             {/* Forgot password */}
             {activeTab === 'login' && (
@@ -475,43 +429,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 22,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E2E8F0',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    fontSize: 13,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 18,
-    marginBottom: 20,
-  },
-  socialBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.2,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   forgotBtn: {
     alignItems: 'center',
