@@ -2,20 +2,37 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, StatusBar, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { QuizMasterLogo } from '../components/illustrations';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
 export default function SplashScreen({ navigation }) {
+  const { user, isLoading } = useAuth();
+
   useEffect(() => {
+    if (isLoading) return;
+
     const timer = setTimeout(() => {
-      navigation.replace('Onboarding');
-    }, 2400);
+      if (user) {
+        navigation.replace('Home');
+      } else {
+        navigation.replace('Onboarding');
+      }
+    }, 2200);
 
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [navigation, user, isLoading]);
+
+  const handlePress = () => {
+    if (user) {
+      navigation.replace('Home');
+    } else {
+      navigation.replace('Onboarding');
+    }
+  };
 
   return (
-    <Pressable style={styles.container} onPress={() => navigation.replace('Onboarding')}>
+    <Pressable style={styles.container} onPress={handlePress}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       <LinearGradient
         colors={['#4F46E5', '#6366F1', '#7C3AED', '#2563EB']}

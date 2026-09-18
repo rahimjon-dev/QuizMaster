@@ -1,8 +1,53 @@
 // Lightweight, client-safe JWT implementation for React Native / Expo
 // Generates standard 3-part base64url encoded tokens: header.payload.signature
 
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+
+const safeBtoa = (input = '') => {
+  if (typeof btoa === 'function') {
+    return btoa(input);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(input, 'binary').toString('base64');
+  }
+  let str = input;
+  let output = '';
+  for (let block = 0, charCode, i = 0, map = chars;
+       str.charAt(i | 0) || (map = '=', i % 1);
+       output += map.charAt(63 & block >> 8 - i % 1 * 8)) {
+    charCode = str.charCodeAt(i += 3/4);
+    if (charCode > 0xFF) {
+      throw new Error("'btoa' failed: The string to be encoded contains characters outside of the Latin1 range.");
+    }
+    block = block << 8 | charCode;
+  }
+  return output;
+};
+
+const safeAtob = (input = '') => {
+  if (typeof atob === 'function') {
+    return atob(input);
+  }
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(input, 'base64').toString('binary');
+  }
+  let str = String(input).replace(/=+$/, '');
+  if (str.length % 4 === 1) {
+    throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
+  }
+  let output = '';
+  for (let bc = 0, bs = 0, buffer, i = 0;
+       buffer = str.charAt(i++);
+       ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
+         bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
+  ) {
+    buffer = chars.indexOf(buffer);
+  }
+  return output;
+};
+
 const base64UrlEncode = (str) => {
-  const base64 = btoa(unescape(encodeURIComponent(str)));
+  const base64 = safeBtoa(unescape(encodeURIComponent(str)));
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
@@ -11,7 +56,7 @@ const base64UrlDecode = (str) => {
   while (base64.length % 4) {
     base64 += '=';
   }
-  return decodeURIComponent(escape(atob(base64)));
+  return decodeURIComponent(escape(safeAtob(base64)));
 };
 
 // Generates a simulated HMAC SHA-256 signature hash from header, payload and secret
