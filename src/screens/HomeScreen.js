@@ -19,10 +19,11 @@ import BottomTabBar from '../components/BottomTabBar';
 import { HomeBannerTrophy } from '../components/illustrations';
 import { playSound } from '../utils/audio';
 import LevelSelectorModal from '../components/LevelSelectorModal';
+import FloatingBubbles from '../components/FloatingBubbles';
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
   const userName = user?.name ? user.name.split(' ')[0] : 'Rahimjon';
@@ -62,6 +63,9 @@ export default function HomeScreen({ navigation }) {
         backgroundColor={theme.background}
       />
       <View style={styles.container}>
+        {/* Ambient Floating Bubbles Background */}
+        <FloatingBubbles />
+
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
@@ -76,39 +80,109 @@ export default function HomeScreen({ navigation }) {
               <Text style={[styles.userNameText, { color: theme.textPrimary }]}>{userName}</Text>
             </View>
 
-            {/* Redesigned Premium Profile Avatar */}
-            <Pressable
-              onPress={() => {
-                playSound('click');
-                navigation.navigate('Profile');
-              }}
-              style={({ pressed }) => [
-                styles.avatarButton,
-                pressed && { transform: [{ scale: 0.95 }] },
-              ]}
-            >
-              <LinearGradient
-                colors={['#818CF8', '#6366F1', '#4F46E5']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.avatarGradientRing}
+            <View style={styles.headerRightBox}>
+              {/* Quick Light/Dark Mode Switcher */}
+              <Pressable
+                onPress={() => {
+                  playSound('toggle');
+                  toggleTheme();
+                }}
+                style={[
+                  styles.headerIconBtn,
+                  { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                ]}
+                accessibilityLabel="Rejimni o'zgartirish"
               >
-                <View style={[styles.avatarInner, { backgroundColor: theme.cardBg }]}>
-                  {userAvatar && userAvatar !== '👤' ? (
-                    <Text style={styles.avatarEmoji}>{userAvatar}</Text>
-                  ) : (
-                    <LinearGradient
-                      colors={['#6366F1', '#8B5CF6']}
-                      style={styles.avatarLetterBox}
-                    >
-                      <Text style={styles.avatarLetter}>{userInitial}</Text>
-                    </LinearGradient>
-                  )}
-                </View>
-              </LinearGradient>
-              {/* Online Indicator Badge */}
-              <View style={styles.onlineBadge} />
-            </Pressable>
+                <Ionicons
+                  name={isDark ? 'sunny' : 'moon'}
+                  size={19}
+                  color={isDark ? '#FBBF24' : '#6366F1'}
+                />
+              </Pressable>
+
+              {/* Login / Register Quick Icon */}
+              <Pressable
+                onPress={() => {
+                  playSound('click');
+                  navigation.navigate('Login');
+                }}
+                style={[
+                  styles.headerIconBtn,
+                  { backgroundColor: theme.cardBg, borderColor: theme.cardBorder },
+                ]}
+                accessibilityLabel="Kirish / Ro'yxatdan o'tish"
+              >
+                <Ionicons name="log-in-outline" size={20} color={theme.accent} />
+              </Pressable>
+
+              {/* Redesigned Premium Profile Avatar */}
+              <Pressable
+                onPress={() => {
+                  playSound('click');
+                  navigation.navigate('Profile');
+                }}
+                style={({ pressed }) => [
+                  styles.avatarButton,
+                  pressed && { transform: [{ scale: 0.95 }] },
+                ]}
+              >
+                <LinearGradient
+                  colors={['#818CF8', '#6366F1', '#4F46E5']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.avatarGradientRing}
+                >
+                  <View style={[styles.avatarInner, { backgroundColor: theme.cardBg }]}>
+                    {userAvatar && userAvatar !== '👤' ? (
+                      <Text style={styles.avatarEmoji}>{userAvatar}</Text>
+                    ) : (
+                      <LinearGradient
+                        colors={['#6366F1', '#8B5CF6']}
+                        style={styles.avatarLetterBox}
+                      >
+                        <Text style={styles.avatarLetter}>{userInitial}</Text>
+                      </LinearGradient>
+                    )}
+                  </View>
+                </LinearGradient>
+                {/* Online Indicator Badge */}
+                <View style={styles.onlineBadge} />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Quick Login / Register Banner */}
+          <View style={[styles.authCard, { backgroundColor: theme.cardBg, borderColor: theme.cardBorder }]}>
+            <View style={styles.authCardLeft}>
+              <Text style={[styles.authCardTitle, { color: theme.textPrimary }]}>
+                {user?.email ? `Hisob: ${user.name}` : "Kirish & Ro'yxatdan o'tish"}
+              </Text>
+              <Text style={[styles.authCardDesc, { color: theme.textSecondary }]}>
+                {user?.email
+                  ? "Natijalaringiz real vaqtda reytingga qo'shilmoqda"
+                  : "Natijalar saqlanishi uchun profilingizga kiring"}
+              </Text>
+            </View>
+            <View style={styles.authCardActions}>
+              <Pressable
+                style={[styles.authBtn, { backgroundColor: theme.accent }]}
+                onPress={() => {
+                  playSound('click');
+                  navigation.navigate('Login', { tab: 'login' });
+                }}
+              >
+                <Text style={styles.authBtnText}>Kirish</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.authBtnOutline, { borderColor: theme.accent }]}
+                onPress={() => {
+                  playSound('click');
+                  navigation.navigate('Login', { tab: 'register' });
+                }}
+              >
+                <Text style={[styles.authBtnOutlineText, { color: theme.accent }]}>Ro'yxat</Text>
+              </Pressable>
+            </View>
           </View>
 
           {/* Daily Champion Banner Card */}
@@ -239,6 +313,76 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     marginTop: 2,
+  },
+  headerRightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  authCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  authCardLeft: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  authCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  authCardDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  authCardActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  authBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  authBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  authBtnOutline: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1.5,
+  },
+  authBtnOutlineText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   avatarButton: {
     position: 'relative',

@@ -1,3 +1,5 @@
+import { QUIZ_QUESTIONS } from './quizzes.js';
+
 // Utility to shuffle an array (Fisher-Yates)
 export function shuffleArray(array) {
   const arr = [...array];
@@ -151,97 +153,73 @@ const CULTURE_FACTS = [
 ];
 
 /**
- * High-performance expansion generator that multiplies verified facts with
- * variations, deep trivia, and diverse formats to guarantee 1000+ unique questions per category!
+ * Builds a clean, authentic question pool by combining:
+ * 1. Curated questions from quizzes.js (standard multiple choice tests)
+ * 2. Direct domain facts with authentic multiple choice options
  */
-function buildLargeCategoryPool(baseList, categoryKey, multiplier = 50) {
+function buildLargeCategoryPool(baseList, categoryKey) {
   const pool = [];
   let idCounter = 1;
 
-  // 1. Add direct base questions
-  baseList.forEach((fact) => {
+  // 1. First add curated high quality questions from QUIZ_QUESTIONS
+  const curated = QUIZ_QUESTIONS[categoryKey] || [];
+  curated.forEach((q) => {
+    const rawUz = q.options.uz || q.options.en;
+    const correctVal = rawUz[q.correctAnswer];
+    const shuffled = shuffleArray(rawUz);
+    const newCorrect = shuffled.indexOf(correctVal);
+
     pool.push({
-      id: `${categoryKey}_${idCounter++}`,
+      id: `${categoryKey}_curated_${idCounter++}`,
+      question: q.question,
+      options: {
+        uz: shuffled,
+        en: q.options.en || shuffled,
+        ru: q.options.ru || shuffled,
+      },
+      correctAnswer: newCorrect >= 0 ? newCorrect : 0,
+      difficulty: q.difficulty || 'Medium',
+      topic: q.topic || 'Test',
+    });
+  });
+
+  // 2. Add verified direct test questions from baseList
+  baseList.forEach((fact) => {
+    const opts = [fact.c, ...fact.w];
+    const shuffled = shuffleArray(opts);
+    const correctIdx = shuffled.indexOf(fact.c);
+
+    pool.push({
+      id: `${categoryKey}_fact_${idCounter++}`,
       question: {
         uz: fact.q,
         en: fact.q,
         ru: fact.q,
       },
       options: {
-        uz: [fact.c, ...fact.w],
-        en: [fact.c, ...fact.w],
-        ru: [fact.c, ...fact.w],
+        uz: shuffled,
+        en: shuffled,
+        ru: shuffled,
       },
-      correctAnswer: 0,
+      correctAnswer: correctIdx,
       difficulty: fact.diff || 'Medium',
       topic: fact.topic,
     });
   });
 
-  // 2. Add rich domain expansions across varied sub-questions
-  for (let i = 0; i < multiplier; i++) {
-    baseList.forEach((fact, fIdx) => {
-      // Create interesting question formulations (reverse fact, definition check, trivia angle)
-      let qVariation = '';
-      let optionsVariation = [];
-      let difficulty = fact.diff;
-
-      if (i % 3 === 0) {
-        qVariation = `Quyidagilardan qaysi biri to'g'ri: ${fact.q}`;
-        optionsVariation = [fact.c, fact.w[0], fact.w[1], fact.w[2]];
-      } else if (i % 3 === 1) {
-        difficulty = 'Hard';
-        qVariation = `Bilimdonlar uchun sinov: "${fact.c}" javobi qaysi savolga mos keladi?`;
-        optionsVariation = [
-          fact.q,
-          `${fact.topic} bo'yicha boshqa ma'lumot`,
-          `Noma'lum tarixiy hodisa`,
-          `Muqobil gipoteza`,
-        ];
-      } else {
-        difficulty = i % 2 === 0 ? 'Hard' : 'Medium';
-        qVariation = `Diqqat bilan o'ylang: ${fact.q} (Tanlov #${i + 1})`;
-        optionsVariation = [fact.c, fact.w[1], fact.w[0], fact.w[2]];
-      }
-
-      // Randomize option placements so answer isn't always 0
-      const shuffledOpts = [...optionsVariation];
-      const correctText = optionsVariation[0];
-      const finalShuffled = shuffleArray(shuffledOpts);
-      const correctIdx = finalShuffled.indexOf(correctText);
-
-      pool.push({
-        id: `${categoryKey}_gen_${idCounter++}`,
-        question: {
-          uz: qVariation,
-          en: qVariation,
-          ru: qVariation,
-        },
-        options: {
-          uz: finalShuffled,
-          en: finalShuffled,
-          ru: finalShuffled,
-        },
-        correctAnswer: correctIdx,
-        difficulty,
-        topic: fact.topic,
-      });
-    });
-  }
-
   return pool;
 }
 
-// Generate the 6 full pools (1000+ per category)
+// Generate the full question pools
 const FULL_QUESTION_ENGINE = {
-  general: buildLargeCategoryPool(GENERAL_FACTS, 'general', 55), // ~1500+ questions
-  programming: buildLargeCategoryPool(TECH_FACTS, 'tech', 55),   // ~1100+ questions
+  general: buildLargeCategoryPool(GENERAL_FACTS, 'general'),
+  programming: buildLargeCategoryPool(TECH_FACTS, 'programming'),
   technology: null, // alias
-  football: buildLargeCategoryPool(SPORT_FACTS, 'sport', 70),   // ~1100+ questions
+  football: buildLargeCategoryPool(SPORT_FACTS, 'football'),
   sport: null, // alias
-  history: buildLargeCategoryPool(HISTORY_FACTS, 'history', 75), // ~1100+ questions
-  science: buildLargeCategoryPool(SCIENCE_FACTS, 'science', 55), // ~1100+ questions
-  culture: buildLargeCategoryPool(CULTURE_FACTS, 'culture', 80), // ~1100+ questions
+  history: buildLargeCategoryPool(HISTORY_FACTS, 'history'),
+  science: buildLargeCategoryPool(SCIENCE_FACTS, 'science'),
+  culture: buildLargeCategoryPool(CULTURE_FACTS, 'culture'),
 };
 
 FULL_QUESTION_ENGINE.technology = FULL_QUESTION_ENGINE.programming;
@@ -249,15 +227,15 @@ FULL_QUESTION_ENGINE.sport = FULL_QUESTION_ENGINE.football;
 
 /**
  * Main Question Retrieval Method for Quiz:
- * - Pulls from the 1000+ pool for the category
+ * - Pulls authentic multiple-choice test questions for the category
  * - Filters by selected difficulty ('Easy' | 'Medium' | 'Hard')
- * - Shuffles randomly so users NEVER see the same questions in the same order
- * - Returns exactly count questions (default 30)
+ * - Shuffles randomly so users NEVER see questions in the same order
+ * - Randomizes options on every game
  *
  * @param {string} categoryId
  * @param {'Easy' | 'Medium' | 'Hard'} difficulty
  * @param {number} count
- * @returns {Array} Array of 30 randomized questions
+ * @returns {Array} Array of randomized genuine test questions
  */
 export function getQuizQuestions(categoryId = 'general', difficulty = 'Medium', count = 30) {
   const normCategory = categoryId.toLowerCase();
@@ -266,7 +244,7 @@ export function getQuizQuestions(categoryId = 'general', difficulty = 'Medium', 
   // Filter pool by difficulty
   let filtered = pool.filter((q) => q.difficulty === difficulty);
 
-  // If filtered pool is smaller than requested count, backfill with remaining shuffled questions
+  // If filtered pool is smaller than requested count, backfill with remaining questions
   if (filtered.length < count) {
     const remaining = pool.filter((q) => q.difficulty !== difficulty);
     filtered = [...filtered, ...shuffleArray(remaining)];
@@ -275,14 +253,14 @@ export function getQuizQuestions(categoryId = 'general', difficulty = 'Medium', 
   // Shuffle the questions thoroughly
   const randomized = shuffleArray(filtered);
 
-  // Take requested count (e.g. 30)
-  const selected = randomized.slice(0, count);
+  // Take requested count (e.g. 15, 20, 30)
+  const selected = randomized.slice(0, Math.min(count, randomized.length));
 
-  // Also randomize options for each question so answers aren't predictable
+  // Shuffling options on each game start so answers are never in fixed positions
   return selected.map((q, idx) => {
-    const options = q.options.uz || q.options.en;
-    const correctVal = options[q.correctAnswer];
-    const shuffledOptions = shuffleArray(options);
+    const uzOpts = q.options.uz || q.options.en;
+    const correctVal = uzOpts[q.correctAnswer];
+    const shuffledOptions = shuffleArray(uzOpts);
     const newCorrectAnswer = shuffledOptions.indexOf(correctVal);
 
     return {
@@ -293,7 +271,7 @@ export function getQuizQuestions(categoryId = 'general', difficulty = 'Medium', 
         en: shuffledOptions,
         ru: shuffledOptions,
       },
-      correctAnswer: newCorrectAnswer,
+      correctAnswer: newCorrectAnswer >= 0 ? newCorrectAnswer : 0,
     };
   });
 }

@@ -18,13 +18,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import BottomTabBar from '../components/BottomTabBar';
+import FloatingBubbles from '../components/FloatingBubbles';
 import { playSound } from '../utils/audio';
 
 const AVAILABLE_AVATARS = ['🦊', '🦁', '🚀', '💻', '⚡', '🦉', '👑', '🎨', '🔥', '🏆', '💎', '🎮'];
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout, updateUserProfile } = useAuth();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
@@ -119,6 +120,17 @@ export default function ProfileScreen({ navigation }) {
       },
     },
     {
+      id: 'switch_account',
+      title: 'Hisobga kirish / Yangi hisob',
+      icon: 'person-add-outline',
+      iconColor: '#6366F1',
+      titleColor: theme.textPrimary,
+      onPress: () => {
+        playSound('click');
+        navigation.navigate('Login');
+      },
+    },
+    {
       id: 'logout',
       title: 'Hisobdan chiqish',
       icon: 'log-out-outline',
@@ -139,7 +151,10 @@ export default function ProfileScreen({ navigation }) {
         backgroundColor={theme.background}
       />
       <View style={styles.container}>
-        {/* Top Header with Settings Gear Icon */}
+        {/* Floating Bubbles in Profile */}
+        <FloatingBubbles />
+
+        {/* Top Header with Theme Switcher and Settings Gear Icon */}
         <View
           style={[
             styles.header,
@@ -147,15 +162,32 @@ export default function ProfileScreen({ navigation }) {
           ]}
         >
           <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Profil</Text>
-          <Pressable
-            onPress={() => {
-              playSound('click');
-              navigation.navigate('Settings');
-            }}
-            style={styles.settingsBtn}
-          >
-            <Ionicons name="settings-outline" size={24} color={theme.textPrimary} />
-          </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Pressable
+              onPress={() => {
+                playSound('toggle');
+                toggleTheme();
+              }}
+              style={styles.settingsBtn}
+              accessibilityLabel="Rejimni o'zgartirish"
+            >
+              <Ionicons
+                name={isDark ? 'sunny' : 'moon'}
+                size={22}
+                color={isDark ? '#FBBF24' : '#6366F1'}
+              />
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                playSound('click');
+                navigation.navigate('Settings');
+              }}
+              style={styles.settingsBtn}
+            >
+              <Ionicons name="settings-outline" size={24} color={theme.textPrimary} />
+            </Pressable>
+          </View>
         </View>
 
         <ScrollView

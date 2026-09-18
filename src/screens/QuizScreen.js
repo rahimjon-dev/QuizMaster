@@ -16,9 +16,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { QUIZ_CATEGORIES } from '../data/quizzes';
 import { useAuth } from '../context/AuthContext';
-import { playSound } from '../utils/audio';
+import { useTheme } from '../context/ThemeContext';
+import {
+  playSound,
+  startMillionaireMusic,
+  stopMillionaireMusic,
+  isMusicEnabled,
+  setMusicEnabled,
+} from '../utils/audio';
 import { getQuizQuestions } from '../data/questionEngine';
 import { getQuestionImageUrl } from '../utils/questionImages';
+import FloatingBubbles from '../components/FloatingBubbles';
 
 // Dynamic Question Hero Banner showing image matched directly to the question
 function QuestionHeroBanner({ question, categoryId, categoryName, difficulty }) {
@@ -26,26 +34,21 @@ function QuestionHeroBanner({ question, categoryId, categoryName, difficulty }) 
 
   const diffBadge = {
     Easy: { label: '🟢 Oson', bg: 'rgba(16, 185, 129, 0.9)' },
-    Medium: { label: '🟡 O\'rtacha', bg: 'rgba(245, 158, 11, 0.9)' },
+    Medium: { label: "🟡 O'rtacha", bg: 'rgba(245, 158, 11, 0.9)' },
     Hard: { label: '🔴 Qiyin', bg: 'rgba(239, 68, 68, 0.9)' },
   }[difficulty] || { label: '🟢 Oson', bg: 'rgba(16, 185, 129, 0.9)' };
 
   return (
     <View style={styles.heroBannerBox}>
-      {/* Real contextual photo matched to question keywords */}
       <Image
         source={{ uri: imageUrl }}
         style={styles.heroBannerImage}
         resizeMode="cover"
       />
-
-      {/* Dark overlay for contrast */}
       <LinearGradient
         colors={['rgba(15, 23, 42, 0.25)', 'rgba(15, 23, 42, 0.85)']}
         style={styles.heroImageOverlay}
       />
-
-      {/* Top Badges */}
       <View style={styles.heroTopRow}>
         <View style={styles.heroCategoryPill}>
           <Text style={styles.heroCategoryText}>{categoryName}</Text>
@@ -54,8 +57,6 @@ function QuestionHeroBanner({ question, categoryId, categoryName, difficulty }) 
           <Text style={styles.heroDiffText}>{diffBadge.label}</Text>
         </View>
       </View>
-
-      {/* Bottom topic caption */}
       {question?.topic ? (
         <View style={styles.heroBottomRow}>
           <Ionicons name="sparkles" size={13} color="#FBBF24" style={{ marginRight: 4 }} />
@@ -68,6 +69,7 @@ function QuestionHeroBanner({ question, categoryId, categoryName, difficulty }) 
 
 export default function QuizScreen({ route, navigation }) {
   const { updateUserStats } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
   const insets = useSafeAreaInsets();
 
   const {
@@ -79,44 +81,90 @@ export default function QuizScreen({ route, navigation }) {
 
   const category =
     QUIZ_CATEGORIES.find((c) => c.id === categoryId) || QUIZ_CATEGORIES[0];
-
   const categoryName = category?.title?.uz || categoryTitle;
 
-  // Prepare questions: dynamic randomized selection of 30 questions from 1000+ pool!
+  // Prepare authentic test questions: randomized selection
   const questionsList = useMemo(() => {
     return getQuizQuestions(categoryId, difficulty, questionCount || 30);
   }, [categoryId, difficulty, questionCount]);
 
   const totalQuestions = questionsList.length || 30;
 
-  // Real gameplay state: starts from question 0, no pre-selected answers!
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(30);
+  const [musicActive, setMusicActive] = useState(true);
+
+  // Initialize and manage "Kim millioner bo'lmoqchi" suspense music
+  useEffect(() => {
+    let isMounted = true;
+    isMusicEnabled().then((enabled) => {
+      if (isMounted) {
+        setMusicActive(enabled);
+        if (enabled) {
+          startMillionaireMusic();
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      stopMillionaireMusic();
+    };
+  }, []);
 
   // Timer countdown
   useEffect(() => {
-    if (timeLeft <= 0) return;
+    if (timeLeft <= 0) {
+      if (!isAnswered) {
+        setIsAnswered(true);
+        playSound('wrong');
+        stopMillionaireMusic();
+      }
+      return;
+    }
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, isAnswered]);
+
+  const handleToggleMusic = async () => {
+    playSound('toggle');
+    const nextState = !musicActive;
+    setMusicActive(nextState);
+    await setMusicEnabled(nextState);
+    if (nextState && !isAnswered) {
+      startMillionaireMusic();
+    } else {
+      stopMillionaireMusic();
+    }
+  };
+
+  const handleToggleTheme = () => {
+    playSound('toggle');
+    toggleTheme();
+  };
+
+  const handleGoBack = () => {
+    stopMillionaireMusic();
+    navigation.goBack();
+  };
 
   const currentQuestion = questionsList[currentIndex] || questionsList[0];
   const isLastQuestion = currentIndex === totalQuestions - 1;
 
   const questionText =
-    typeof currentQuestion.question === 'object'
+    typeof currentQuestion?.question === 'object'
       ? currentQuestion.question.uz || currentQuestion.question.en
-      : currentQuestion.question;
+      : currentQuestion?.question || 'Savol';
 
   const optionsList =
-    typeof currentQuestion.options === 'object' && !Array.isArray(currentQuestion.options)
+    typeof currentQuestion?.options === 'object' && !Array.isArray(currentQuestion.options)
       ? currentQuestion.options.uz || currentQuestion.options.en
-      : currentQuestion.options;
+      : currentQuestion?.options || [];
 
   const optionLetters = ['A', 'B', 'C', 'D'];
 
@@ -124,6 +172,9 @@ export default function QuizScreen({ route, navigation }) {
     if (isAnswered) return;
     setSelectedAnswer(index);
     setIsAnswered(true);
+
+    // Pause tension music when answer is revealed
+    stopMillionaireMusic();
 
     if (index === currentQuestion.correctAnswer) {
       playSound('success');
@@ -140,6 +191,7 @@ export default function QuizScreen({ route, navigation }) {
     }
 
     if (isLastQuestion) {
+      stopMillionaireMusic();
       const finalScore = score + (selectedAnswer === currentQuestion.correctAnswer ? 0 : 0);
       const percentage = Math.round((finalScore / totalQuestions) * 100);
       const wrongCount = totalQuestions - finalScore;
@@ -161,6 +213,11 @@ export default function QuizScreen({ route, navigation }) {
       setSelectedAnswer(null);
       setIsAnswered(false);
       setTimeLeft(30);
+
+      // Resume tension soundtrack on next question if music is enabled
+      if (musicActive) {
+        startMillionaireMusic();
+      }
     }
   };
 
@@ -173,25 +230,102 @@ export default function QuizScreen({ route, navigation }) {
   const progressPercent = ((currentIndex + 1) / totalQuestions) * 100;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+      <StatusBar
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+        backgroundColor={theme.background}
+      />
+
+      {/* Background Animated Floating Bubbles */}
+      <FloatingBubbles />
+
       <View style={styles.container}>
-        {/* Top Header Row with safe area padding */}
+        {/* Top Header Row with controls */}
         <View
           style={[
             styles.header,
-            { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 10) + 8 },
+            {
+              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 10) + 8,
+              borderBottomColor: theme.divider,
+            },
           ]}
         >
-          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color="#0F172A" />
-            <Text style={styles.headerCategoryText}>{categoryName}</Text>
+          <Pressable onPress={handleGoBack} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={theme.textPrimary} />
+            <Text
+              style={[styles.headerCategoryText, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              {categoryName}
+            </Text>
           </Pressable>
 
-          {/* Timer Badge */}
-          <View style={styles.timerBadge}>
-            <Ionicons name="time-outline" size={16} color="#EF4444" style={styles.timerIcon} />
-            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
+          {/* Right Action Controls: Music, Theme, Timer */}
+          <View style={styles.headerRightActions}>
+            {/* Suspense Music Toggle ("Kim millioner bo'lmoqchi") */}
+            <Pressable
+              onPress={handleToggleMusic}
+              style={[
+                styles.iconBtn,
+                {
+                  backgroundColor: theme.cardBg,
+                  borderColor: theme.cardBorder,
+                },
+                musicActive && styles.iconBtnActive,
+              ]}
+              accessibilityLabel="Musiqa"
+            >
+              <Ionicons
+                name={musicActive ? 'musical-notes' : 'volume-mute'}
+                size={18}
+                color={musicActive ? '#6366F1' : theme.textMuted}
+              />
+            </Pressable>
+
+            {/* Light / Dark Mode Toggle */}
+            <Pressable
+              onPress={handleToggleTheme}
+              style={[
+                styles.iconBtn,
+                {
+                  backgroundColor: theme.cardBg,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+              accessibilityLabel="Rejimni o'zgartirish"
+            >
+              <Ionicons
+                name={isDark ? 'sunny' : 'moon'}
+                size={18}
+                color={isDark ? '#FBBF24' : '#6366F1'}
+              />
+            </Pressable>
+
+            {/* Timer Badge */}
+            <View
+              style={[
+                styles.timerBadge,
+                {
+                  backgroundColor: theme.cardBg,
+                  borderColor: theme.cardBorder,
+                },
+              ]}
+            >
+              <Ionicons
+                name="time-outline"
+                size={16}
+                color={timeLeft <= 10 ? '#EF4444' : '#F59E0B'}
+                style={styles.timerIcon}
+              />
+              <Text
+                style={[
+                  styles.timerText,
+                  { color: timeLeft <= 10 ? '#EF4444' : theme.textPrimary },
+                ]}
+              >
+                {formatTime(timeLeft)}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -201,15 +335,23 @@ export default function QuizScreen({ route, navigation }) {
         >
           {/* Progress Indicator */}
           <View style={styles.progressRow}>
-            <Text style={styles.progressCounter}>
-              {currentIndex + 1}/{totalQuestions}
+            <Text style={[styles.progressCounter, { color: theme.textSecondary }]}>
+              {currentIndex + 1} / {totalQuestions}
             </Text>
           </View>
-          <View style={styles.progressBarTrack}>
-            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+          <View style={[styles.progressBarTrack, { backgroundColor: theme.cardBorder }]}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${progressPercent}%`,
+                  backgroundColor: theme.accent,
+                },
+              ]}
+            />
           </View>
 
-          {/* Dynamic Question Hero Banner matching the question image */}
+          {/* Dynamic Question Hero Banner */}
           <QuestionHeroBanner
             question={currentQuestion}
             categoryId={category?.id || categoryId}
@@ -218,7 +360,9 @@ export default function QuizScreen({ route, navigation }) {
           />
 
           {/* Question Text */}
-          <Text style={styles.questionTitle}>{questionText}</Text>
+          <Text style={[styles.questionTitle, { color: theme.textPrimary }]}>
+            {questionText}
+          </Text>
 
           {/* Options List */}
           <View style={styles.optionsList}>
@@ -227,28 +371,31 @@ export default function QuizScreen({ route, navigation }) {
               const isSelected = selectedAnswer === idx;
               const isCorrect = idx === currentQuestion.correctAnswer;
 
-              let optionStyle = styles.optionItemDefault;
-              let letterBoxStyle = styles.letterBoxDefault;
-              let letterTextStyle = styles.letterTextDefault;
-              let optionTextStyle = styles.optionTextDefault;
+              let optionBg = theme.cardBg;
+              let optionBorder = theme.cardBorder;
+              let letterBoxBg = isDark ? '#334155' : '#F1F5F9';
+              let letterColor = theme.textPrimary;
+              let textColor = theme.textPrimary;
               let statusIcon = null;
 
               if (isAnswered) {
                 if (isCorrect) {
-                  optionStyle = styles.optionItemCorrect;
-                  letterBoxStyle = styles.letterBoxCorrect;
-                  letterTextStyle = styles.letterTextActive;
-                  optionTextStyle = styles.optionTextActive;
+                  optionBg = isDark ? 'rgba(16, 185, 129, 0.25)' : '#ECFDF5';
+                  optionBorder = '#10B981';
+                  letterBoxBg = '#10B981';
+                  letterColor = '#FFFFFF';
+                  textColor = isDark ? '#A7F3D0' : '#065F46';
                   statusIcon = (
-                    <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                    <Ionicons name="checkmark-circle" size={22} color="#10B981" />
                   );
                 } else if (isSelected && !isCorrect) {
-                  optionStyle = styles.optionItemWrong;
-                  letterBoxStyle = styles.letterBoxWrong;
-                  letterTextStyle = styles.letterTextActive;
-                  optionTextStyle = styles.optionTextActive;
+                  optionBg = isDark ? 'rgba(239, 68, 68, 0.25)' : '#FEF2F2';
+                  optionBorder = '#EF4444';
+                  letterBoxBg = '#EF4444';
+                  letterColor = '#FFFFFF';
+                  textColor = isDark ? '#FECACA' : '#991B1B';
                   statusIcon = (
-                    <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+                    <Ionicons name="close-circle" size={22} color="#EF4444" />
                   );
                 }
               }
@@ -258,18 +405,21 @@ export default function QuizScreen({ route, navigation }) {
                   key={idx}
                   style={({ pressed }) => [
                     styles.optionItemBase,
-                    optionStyle,
+                    {
+                      backgroundColor: optionBg,
+                      borderColor: optionBorder,
+                    },
                     pressed && !isAnswered && styles.optionPressed,
                   ]}
                   onPress={() => handleSelectOption(idx)}
                 >
                   <View style={styles.optionLeft}>
-                    <View style={[styles.letterBoxBase, letterBoxStyle]}>
-                      <Text style={[styles.letterTextBase, letterTextStyle]}>
+                    <View style={[styles.letterBoxBase, { backgroundColor: letterBoxBg }]}>
+                      <Text style={[styles.letterTextBase, { color: letterColor }]}>
                         {letter}
                       </Text>
                     </View>
-                    <Text style={[styles.optionTextBase, optionTextStyle]}>
+                    <Text style={[styles.optionTextBase, { color: textColor }]}>
                       {option}
                     </Text>
                   </View>
@@ -297,7 +447,7 @@ export default function QuizScreen({ route, navigation }) {
             onPress={handleNextQuestion}
           >
             <Text style={styles.nextBtnText}>
-              {isLastQuestion ? 'Natijani ko\'rish' : 'Keyingi'}
+              {isLastQuestion ? "Natijani ko'rish" : 'Keyingi'}
             </Text>
           </Pressable>
         </View>
@@ -309,7 +459,6 @@ export default function QuizScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
   },
   container: {
     flex: 1,
@@ -318,9 +467,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 10,
-    backgroundColor: '#F8FAFC',
     zIndex: 10,
   },
   backBtn: {
@@ -328,26 +476,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingVertical: 4,
+    flex: 1,
+    marginRight: 8,
   },
   headerCategoryText: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  iconBtnActive: {
+    borderColor: '#6366F1',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
   },
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#FECACA',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    shadowColor: '#EF4444',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
   },
   timerIcon: {
     marginRight: 4,
@@ -355,66 +524,52 @@ const styles = StyleSheet.create({
   timerText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0F172A',
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 100,
+    zIndex: 1,
   },
   progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 6,
+    marginTop: 10,
+    marginBottom: 8,
   },
   progressCounter: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
   },
   progressBarTrack: {
     height: 6,
-    backgroundColor: '#E2E8F0',
     borderRadius: 3,
     overflow: 'hidden',
+    marginBottom: 16,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#6366F1',
     borderRadius: 3,
   },
-
-  // Question Hero Banner with matching contextual photo
   heroBannerBox: {
     width: '100%',
-    height: 145,
+    height: 150,
     borderRadius: 18,
-    marginVertical: 14,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#0F172A',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: 18,
+    backgroundColor: '#1E293B',
   },
   heroBannerImage: {
     width: '100%',
     height: '100%',
-    position: 'absolute',
   },
   heroImageOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
   },
   heroTopRow: {
     position: 'absolute',
-    top: 10,
+    top: 12,
     left: 12,
     right: 12,
     flexDirection: 'row',
@@ -426,48 +581,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   heroCategoryText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   heroDiffPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
   },
   heroDiffText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
   },
   heroBottomRow: {
     position: 'absolute',
-    bottom: 8,
-    left: 12,
+    bottom: 12,
+    left: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
   },
   heroTagText: {
-    fontSize: 11,
-    fontWeight: '700',
     color: '#F8FAFC',
-    letterSpacing: 0.3,
+    fontSize: 12,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowRadius: 4,
   },
-
   questionTitle: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#0F172A',
     lineHeight: 24,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   optionsList: {
     gap: 12,
@@ -476,116 +624,77 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 14,
     borderRadius: 16,
     borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
   optionPressed: {
-    transform: [{ scale: 0.985 }],
+    transform: [{ scale: 0.98 }],
   },
   optionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    paddingRight: 10,
   },
   letterBoxBase: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
   },
   letterTextBase: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
   },
   optionTextBase: {
     fontSize: 15,
     fontWeight: '600',
     flex: 1,
-  },
-
-  // Default state
-  optionItemDefault: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  letterBoxDefault: {
-    backgroundColor: '#F1F5F9',
-  },
-  letterTextDefault: {
-    color: '#64748B',
-  },
-  optionTextDefault: {
-    color: '#1E293B',
-  },
-
-  // Correct state (Green)
-  optionItemCorrect: {
-    backgroundColor: '#10B981',
-    borderColor: '#059669',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  letterBoxCorrect: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-
-  // Wrong state (Red)
-  optionItemWrong: {
-    backgroundColor: '#EF4444',
-    borderColor: '#DC2626',
-  },
-  letterBoxWrong: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-
-  letterTextActive: {
-    color: '#FFFFFF',
-  },
-  optionTextActive: {
-    color: '#FFFFFF',
+    lineHeight: 20,
   },
   statusIconBox: {
-    marginLeft: 10,
+    marginLeft: 6,
   },
   bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 20,
-    paddingTop: 10,
-    backgroundColor: '#F8FAFC',
+    paddingTop: 12,
+    backgroundColor: 'transparent',
+    zIndex: 10,
   },
   nextBtn: {
     backgroundColor: '#6366F1',
-    paddingVertical: 16,
-    borderRadius: 28,
+    borderRadius: 16,
+    paddingVertical: 15,
     alignItems: 'center',
-    justifyContent: 'center',
     shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
     shadowRadius: 10,
-    elevation: 6,
+    elevation: 4,
   },
   nextBtnDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#94A3B8',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   nextBtnPressed: {
-    opacity: 0.9,
     transform: [{ scale: 0.98 }],
   },
   nextBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

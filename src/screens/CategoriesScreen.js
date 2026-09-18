@@ -18,10 +18,11 @@ import BottomTabBar from '../components/BottomTabBar';
 import { useTheme } from '../context/ThemeContext';
 import { playSound } from '../utils/audio';
 import LevelSelectorModal from '../components/LevelSelectorModal';
+import FloatingBubbles from '../components/FloatingBubbles';
 
 export default function CategoriesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isLevelModalVisible, setIsLevelModalVisible] = useState(false);
@@ -53,6 +54,9 @@ export default function CategoriesScreen({ navigation }) {
         backgroundColor={theme.background}
       />
       <View style={styles.container}>
+        {/* Floating Bubbles in Categories */}
+        <FloatingBubbles />
+
         {/* Top Header */}
         <View style={[styles.header, { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 }]}>
           <Pressable
@@ -65,7 +69,20 @@ export default function CategoriesScreen({ navigation }) {
             <Ionicons name="arrow-back" size={24} color={theme.textPrimary} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Kategoriyalar</Text>
-          <View style={styles.headerRightPlaceholder} />
+          <Pressable
+            onPress={() => {
+              playSound('toggle');
+              toggleTheme();
+            }}
+            style={{ padding: 6 }}
+            accessibilityLabel="Rejimni o'zgartirish"
+          >
+            <Ionicons
+              name={isDark ? 'sunny' : 'moon'}
+              size={22}
+              color={isDark ? '#FBBF24' : '#6366F1'}
+            />
+          </Pressable>
         </View>
 
         {/* Search Bar */}

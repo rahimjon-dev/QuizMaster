@@ -18,11 +18,12 @@ import { useTheme } from '../context/ThemeContext';
 import BottomTabBar from '../components/BottomTabBar';
 import { getLeaderboardData } from '../services/leaderboard';
 import { playSound } from '../utils/audio';
+import FloatingBubbles from '../components/FloatingBubbles';
 
 export default function LeaderboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { theme, isDark } = useTheme();
+  const { theme, isDark, toggleTheme } = useTheme();
 
   const [activeTab, setActiveTab] = useState('umumiy'); // 'umumiy' | 'haftalik' | 'oylik'
   const [leaderboard, setLeaderboard] = useState([]);
@@ -56,6 +57,9 @@ export default function LeaderboardScreen({ navigation }) {
         backgroundColor={theme.background}
       />
       <View style={styles.container}>
+        {/* Floating Bubbles in Leaderboard */}
+        <FloatingBubbles />
+
         {/* Header */}
         <View
           style={[
@@ -63,10 +67,28 @@ export default function LeaderboardScreen({ navigation }) {
             { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 },
           ]}
         >
-          <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Reyting</Text>
-          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-            Real vaqtdagi peshqadamlar jadvali
-          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View>
+              <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>Reyting</Text>
+              <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+                Real vaqtdagi peshqadamlar jadvali
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                playSound('toggle');
+                toggleTheme();
+              }}
+              style={{ padding: 8 }}
+              accessibilityLabel="Rejimni o'zgartirish"
+            >
+              <Ionicons
+                name={isDark ? 'sunny' : 'moon'}
+                size={22}
+                color={isDark ? '#FBBF24' : '#6366F1'}
+              />
+            </Pressable>
+          </View>
         </View>
 
         {/* Filter Tabs: Umumiy | Haftalik | Oylik */}
