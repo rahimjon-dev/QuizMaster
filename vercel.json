@@ -1,4 +1,5 @@
 {
+  "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "npx expo export --platform web || echo 'Using prebuilt dist'",
   "outputDirectory": "dist",
   "framework": null,
