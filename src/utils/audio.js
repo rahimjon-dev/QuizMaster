@@ -4,10 +4,13 @@ import { Platform } from 'react-native';
 const SOUND_STORAGE_KEY = '@quizmaster_sound_enabled';
 const MUSIC_STORAGE_KEY = '@quizmaster_music_enabled';
 
-// Audio assets with dual strategy: local path + fast CDN backup
+// High quality audio CDN sources with fallbacks
 const AUDIO_SOURCES = {
-  suspense: [
+  // Sokin, tinchlantiruvchi ambient musiqa
+  calm: [
+    '/assets/audio/calm_music.mp3',
     '/assets/audio/suspense.mp3',
+    'https://assets.mixkit.co/active_storage/sfx/2440/2440-preview.mp3',
     'https://assets.mixkit.co/active_storage/sfx/2431/2431-preview.mp3',
   ],
   correct: [
@@ -26,7 +29,14 @@ const AUDIO_SOURCES = {
 
 let bgMusicAudio = null;
 let audioContext = null;
+let ambientOscillators = [];
+let ambientGainNode = null;
+let isAmbientPlaying = false;
+let userHasInteracted = false;
 
+/**
+ * Get or create the shared Web Audio Context
+ */
 const getAudioContext = () => {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     if (!audioContext) {
@@ -41,6 +51,39 @@ const getAudioContext = () => {
   }
   return audioContext;
 };
+
+/**
+ * Mobile touch audio unlocker:
+ * Mobile browsers require a user gesture to enable audio playback.
+ * We attach a one-time touch/click listener to unlock the audio context immediately.
+ */
+if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const unlockAudio = () => {
+    userHasInteracted = true;
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    // Create and play an inaudible 1-sample buffer to unlock HTML5 audio pipeline
+    try {
+      if (ctx) {
+        const buffer = ctx.createBuffer(1, 1, 22050);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start(0);
+      }
+    } catch (e) {}
+
+    window.removeEventListener('touchstart', unlockAudio);
+    window.removeEventListener('touchend', unlockAudio);
+    window.removeEventListener('click', unlockAudio);
+  };
+
+  window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+  window.addEventListener('touchend', unlockAudio, { passive: true, once: true });
+  window.addEventListener('click', unlockAudio, { passive: true, once: true });
+}
 
 export const isSoundEnabled = async () => {
   try {
@@ -72,7 +115,7 @@ export const setMusicEnabled = async (enabled) => {
   try {
     await AsyncStorage.setItem(MUSIC_STORAGE_KEY, enabled ? 'true' : 'false');
     if (!enabled) {
-      stopMillionaireMusic();
+      stopCalmMusic();
     }
   } catch (e) {
     console.error('Failed to save music state:', e);
@@ -80,9 +123,8 @@ export const setMusicEnabled = async (enabled) => {
 };
 
 /**
- * Play a high quality sound effect (Correct, Wrong, Click, Toggle)
- * Uses HTML5 Audio with Web Audio API fallback
- * @param {'click' | 'correct' | 'success' | 'wrong' | 'toggle'} type
+ * Play an audible sound effect (click, correct, wrong, toggle)
+ * Runs HTML5 Audio with instant Web Audio API synthesizer guarantee
  */
 export const playSound = async (type = 'click') => {
   const enabled = await isSoundEnabled();
@@ -90,148 +132,222 @@ export const playSound = async (type = 'click') => {
 
   const resolvedType = type === 'success' ? 'correct' : type;
 
-  // 1. Try HTML5 Audio in Web / Browser
+  // Always play synthesized sound immediately for 0ms tactile feedback
+  playSynthesizedFeedback(resolvedType);
+
+  // Also trigger HTML5 Audio for rich acoustic depth if supported
   if (typeof window !== 'undefined' && typeof window.Audio !== 'undefined') {
     const sources = AUDIO_SOURCES[resolvedType] || AUDIO_SOURCES.click;
-    let played = false;
-
     for (const src of sources) {
       try {
         const audio = new window.Audio(src);
         audio.volume = resolvedType === 'correct' ? 0.75 : resolvedType === 'wrong' ? 0.65 : 0.45;
         const playPromise = audio.play();
         if (playPromise !== undefined) {
-          await playPromise;
-          played = true;
+          playPromise.catch(() => {});
           break;
         }
-      } catch (e) {
-        // Try next source
-      }
+      } catch (e) {}
     }
-
-    if (played) return;
   }
-
-  // 2. Synthesized fallback via Web Audio API if HTML5 audio cannot play
-  playSynthesizedFallback(resolvedType);
 };
 
-function playSynthesizedFallback(type) {
+/**
+ * Hardware-level Web Audio API sound generator (Zero latency, works offline, 100% reliable)
+ */
+function playSynthesizedFeedback(type) {
   const ctx = getAudioContext();
   if (!ctx) return;
 
   try {
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
     const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
 
     if (type === 'correct') {
-      // High triumph arpeggio (C5 -> E5 -> G5 -> C6)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
+      // 🌟 Triumphant Victory Chime: C5 (523Hz) -> E5 (659Hz) -> G5 (784Hz) -> C6 (1046Hz)
+      const notes = [
+        { f: 523.25, start: 0.0, dur: 0.28 },
+        { f: 659.25, start: 0.08, dur: 0.3 },
+        { f: 783.99, start: 0.16, dur: 0.35 },
+        { f: 1046.5, start: 0.24, dur: 0.6 },
+      ];
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(523.25, now);
-      osc.frequency.setValueAtTime(659.25, now + 0.1);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
-
-      osc2.type = 'triangle';
-      osc2.frequency.setValueAtTime(783.99, now + 0.15);
-      osc2.frequency.setValueAtTime(1046.5, now + 0.25);
-      gain2.gain.setValueAtTime(0.25, now + 0.15);
-      gain2.gain.linearRampToValueAtTime(0.01, now + 0.55);
-
-      osc.start(now);
-      osc.stop(now + 0.4);
-      osc2.start(now + 0.15);
-      osc2.stop(now + 0.55);
+      notes.forEach(({ f, start, dur }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(f, now + start);
+        gain.gain.setValueAtTime(0.28, now + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + start);
+        osc.stop(now + start + dur);
+      });
     } else if (type === 'wrong') {
-      // Low buzzer / dissonance (F#2 + G2 buzzer)
+      // ❌ Distinct Error Buzzer: Dissonant dual frequency drop
+      const osc1 = ctx.createOscillator();
       const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
+      const gain = ctx.createGain();
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(185, now);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
-
+      osc1.type = 'sawtooth';
       osc2.type = 'sawtooth';
-      osc2.frequency.setValueAtTime(196, now); // Dissonant half-step
-      gain2.gain.setValueAtTime(0.25, now);
-      gain2.gain.linearRampToValueAtTime(0.01, now + 0.35);
 
-      osc.start(now);
-      osc.stop(now + 0.35);
+      osc1.frequency.setValueAtTime(165, now);
+      osc1.frequency.exponentialRampToValueAtTime(110, now + 0.38);
+
+      osc2.frequency.setValueAtTime(175, now); // Dissonant half-step
+      osc2.frequency.exponentialRampToValueAtTime(115, now + 0.38);
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
       osc2.start(now);
-      osc2.stop(now + 0.35);
+      osc1.stop(now + 0.4);
+      osc2.stop(now + 0.4);
     } else {
-      // Tap / click
+      // 🔘 Tactile Button Click: Crisp pop
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(650, now);
-      osc.frequency.exponentialRampToValueAtTime(850, now + 0.04);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.linearRampToValueAtTime(0.01, now + 0.04);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.04);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.04);
+      osc.stop(now + 0.05);
     }
   } catch (e) {}
 }
 
 // -------------------------------------------------------------
-// SUSPENSE QUIZ BACKGROUND MUSIC (REAL AUDIO TRACK)
+// SOKIN FON MUSIQASI (CALM & RELAXING AMBIENT BACKGROUND MUSIC)
 // -------------------------------------------------------------
 
 /**
- * Starts real suspense quiz music track in a smooth loop
+ * Starts a calm, relaxing background music loop.
+ * Dual implementation:
+ * 1. Rich HTML5 Audio stream (calm ambient MP3)
+ * 2. Harmonic Web Audio ambient generator (Lush meditative peaceful chord drone)
  */
-export const startMillionaireMusic = async () => {
+export const startCalmMusic = async () => {
   const enabled = await isMusicEnabled();
   if (!enabled) return;
 
+  // 1. Try HTML5 Audio
   if (typeof window !== 'undefined' && typeof window.Audio !== 'undefined') {
     try {
       if (!bgMusicAudio) {
-        // Try local file first, then CDN
-        bgMusicAudio = new window.Audio(AUDIO_SOURCES.suspense[0]);
+        bgMusicAudio = new window.Audio(AUDIO_SOURCES.calm[0]);
         bgMusicAudio.loop = true;
-        bgMusicAudio.volume = 0.35;
+        bgMusicAudio.volume = 0.28;
 
-        // If local file errors, switch to CDN
+        let srcIndex = 0;
         bgMusicAudio.onerror = () => {
-          if (bgMusicAudio) {
-            bgMusicAudio.src = AUDIO_SOURCES.suspense[1];
+          srcIndex++;
+          if (srcIndex < AUDIO_SOURCES.calm.length && bgMusicAudio) {
+            bgMusicAudio.src = AUDIO_SOURCES.calm[srcIndex];
             bgMusicAudio.play().catch(() => {});
           }
         };
       }
 
-      bgMusicAudio.volume = 0.35;
-      bgMusicAudio.play().catch((err) => {
-        console.log('Background music play note:', err.message);
-      });
-      return;
+      bgMusicAudio.volume = 0.28;
+      const promise = bgMusicAudio.play();
+      if (promise !== undefined) {
+        promise.catch(() => {
+          // If browser blocked autoplay, start procedural ambient soundscape
+          startSynthesizedAmbientDrone();
+        });
+      }
     } catch (e) {
-      console.warn('HTML5 music note:', e);
+      startSynthesizedAmbientDrone();
     }
+  } else {
+    startSynthesizedAmbientDrone();
   }
 };
 
 /**
- * Stops or pauses suspense background music
+ * Creates a soothing, gentle ambient meditation chord in Web Audio API.
+ * Peaceful, relaxing, never jarring, loops infinitely.
  */
-export const stopMillionaireMusic = () => {
+function startSynthesizedAmbientDrone() {
+  const ctx = getAudioContext();
+  if (!ctx || isAmbientPlaying) return;
+
+  try {
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    isAmbientPlaying = true;
+    ambientOscillators = [];
+
+    ambientGainNode = ctx.createGain();
+    ambientGainNode.gain.setValueAtTime(0.01, ctx.currentTime);
+    ambientGainNode.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 2.5); // smooth fade in
+
+    // Low-pass warm filter
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(480, ctx.currentTime);
+
+    // Warm Major 9th chord frequencies: C3 (130.8), G3 (196.0), B3 (246.9), E4 (329.6)
+    const chordFrequencies = [130.81, 196.0, 246.94, 329.63];
+
+    chordFrequencies.forEach((freq) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      osc.connect(ambientGainNode);
+      osc.start();
+      ambientOscillators.push(osc);
+    });
+
+    ambientGainNode.connect(filter);
+    filter.connect(ctx.destination);
+  } catch (e) {}
+}
+
+/**
+ * Stops or pauses background music smoothly
+ */
+export const stopCalmMusic = () => {
   try {
     if (bgMusicAudio) {
       bgMusicAudio.pause();
       bgMusicAudio.currentTime = 0;
     }
   } catch (e) {}
+
+  try {
+    if (isAmbientPlaying && ambientGainNode && audioContext) {
+      ambientGainNode.gain.linearRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+      setTimeout(() => {
+        ambientOscillators.forEach((osc) => {
+          try {
+            osc.stop();
+            osc.disconnect();
+          } catch (err) {}
+        });
+        ambientOscillators = [];
+        isAmbientPlaying = false;
+      }, 350);
+    }
+  } catch (e) {}
 };
+
+// Aliases so all previous calls work seamlessly
+export const startMillionaireMusic = startCalmMusic;
+export const stopMillionaireMusic = stopCalmMusic;

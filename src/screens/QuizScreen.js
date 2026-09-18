@@ -167,7 +167,12 @@ function AnimatedOptionCard({
             borderColor: optionBorder,
           },
         ]}
-        onPressIn={handlePressIn}
+        onPressIn={() => {
+          handlePressIn();
+          if (!isAnswered) {
+            playSound('click');
+          }
+        }}
         onPressOut={handlePressOut}
         onPress={() => onSelect(idx)}
       >
@@ -373,7 +378,8 @@ export default function QuizScreen({ route, navigation }) {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.background}
+        backgroundColor="transparent"
+        translucent
       />
 
       {/* Background Animated Floating Bubbles */}
@@ -385,7 +391,7 @@ export default function QuizScreen({ route, navigation }) {
           style={[
             styles.header,
             {
-              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 10) + 8,
+              paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 26 : 16) + 12,
               borderBottomColor: theme.divider,
             },
           ]}
@@ -542,7 +548,7 @@ export default function QuizScreen({ route, navigation }) {
         <View
           style={[
             styles.bottomBar,
-            { paddingBottom: Math.max(insets.bottom, 16) },
+            { paddingBottom: Math.max(insets.bottom, 16) + 12 },
           ]}
         >
           <Pressable

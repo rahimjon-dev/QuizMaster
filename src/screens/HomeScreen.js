@@ -60,7 +60,8 @@ export default function HomeScreen({ navigation }) {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
       <StatusBar
         barStyle={isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.background}
+        backgroundColor="transparent"
+        translucent
       />
       <View style={styles.container}>
         {/* Ambient Floating Bubbles Background */}
@@ -69,7 +70,7 @@ export default function HomeScreen({ navigation }) {
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
-            { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 16 : 8) + 8 },
+            { paddingTop: Math.max(insets.top, Platform.OS === 'android' ? 26 : 14) + 10 },
           ]}
           showsVerticalScrollIndicator={false}
         >
